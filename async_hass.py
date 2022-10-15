@@ -112,7 +112,7 @@ class HomeAssistantMQTT:
         config['wifi_pw'] = wifi_password
         config['subs_cb'] = self.mqtt_callback
         config['server'] = url_split[0]
-        config['port'] = int(url_split[1]) if len(url_split) == 2 else None
+        config['port'] = int(url_split[1]) if len(url_split) == 2 else 1883  # default mqtt port
         config['user'] = user
         config['password'] = bytearray(password)
 

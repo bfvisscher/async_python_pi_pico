@@ -1,9 +1,11 @@
-from machine import Pin, bitstream
 import rp2
+from machine import Pin, bitstream
+
 import dma
 from async_runner import as_pins, as_pwm
-from pixel_buffers import PixelBufferPWM, PixelBufferNeo, PixelBuffer
 from pio_state_machines import __WS282B__, __SK6812__
+from pixel_buffers import PixelBufferPWM, PixelBufferNeo, PixelBuffer
+
 
 def pin_driver(pin_ids, pattern_fcn, **kwargs):
     pins = as_pins(pin_ids, Pin.OUT)
@@ -58,6 +60,8 @@ def neo_driver_pio(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
         pio_driver = __WS282B__
     elif bpp == 4:
         pio_driver = __SK6812__
+    else:
+        print('bbp can not be %i but most be either 3 or 4' % bpp)
 
     pin = Pin(pin, Pin.OUT)
 
@@ -73,7 +77,6 @@ def neo_driver_pio(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
     sm_put = lambda x: sm.put(x, cut)
 
     for delay_ms in pattern_fcn(pixel_buffer=pixel_buffer, **kwargs):
-        # update
 
         # sent pixels to leds
         buf = pixel_buffer.buf
@@ -89,7 +92,7 @@ def neo_driver_dma(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
     elif bpp == 4:
         pio_driver = __SK6812__
     else:
-        print('bbp can not be %i but most be eiither 3 or 4' % bpp)
+        print('bbp can not be %i but most be either 3 or 4' % bpp)
 
     pin = Pin(pin, Pin.OUT)
     sm = rp2.StateMachine(state_machine, pio_driver, freq=8_000_000, sideset_base=pin)
@@ -97,7 +100,7 @@ def neo_driver_dma(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
 
     ch = dma.dma.allocate_channel()
     if ch is None:
-        print('Could not allocate a dedicated DMA channel for NeoDriver')
+        print('Could not allocate a dedicated DMA channel for neo_driver_dma')
 
     pixel_buffer = PixelBufferNeo(n, bpp, dma=True)
     yield 0
