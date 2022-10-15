@@ -25,7 +25,7 @@ with open('secrets.json', 'rt') as f:
 hass = async_hass.HomeAssistantMQTT('192.168.68.11:1883', secrets['mqtt.username'], secrets['mqtt.password'], secrets['wifi.ssid'], secrets['wifi.password'])
 
 networklogins = {secrets['wifi.ssid']: secrets['wifi.password']}
-# add_task(connect_wifi, networklogins, blackboard)
+# add_task(connect_wifi, networklogins)
 
 
 add_task(cpu_load)
