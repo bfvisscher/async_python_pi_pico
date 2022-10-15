@@ -244,6 +244,11 @@ class PixelBufferNeo(PixelBuffer):
 
 
 class PixelBufferSegment(PixelBuffer):
+    """
+    Split a single pixelbuffer into multiple independent sub segments. Each can display different patterns
+    and can be accessed independently from each other.
+    """
+
     def __init__(self, pixel_buffer: PixelBuffer, start: int, end: int):
         self.buf = pixel_buffer
         self.start = max(0, min(start, self.buf.n))
@@ -270,7 +275,11 @@ class PixelBufferSegment(PixelBuffer):
 
     @micropython.native
     def __getitem__(self, i):
-        return self.buf.__getitem__(i + self.start)
+        if isinstance(i, slice):
+            i = self._reslice(i)
+        else:
+            i += self.start
+        return self.buf.__getitem__(i)
 
     @micropython.native
     def __setitem__(self, i: int, v):
