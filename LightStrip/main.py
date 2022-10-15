@@ -5,6 +5,8 @@ from async_tasks import *
 from hass_entities import hass_lightstrip
 from patterns import *
 import json
+
+
 PICO_W = True
 
 if PICO_W:

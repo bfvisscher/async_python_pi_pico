@@ -1,5 +1,9 @@
-# from machiune import mem
-# from typing import Optional
+#   This file is a work in progress
+#   The aim is to have different types of dma transfers readily available
+#   to and from all the different options ie
+#   mem -> mem, pio -> mem mem -> pio, mem->i2c etc
+#
+
 
 import micropython
 from uctypes import BF_POS, BF_LEN, UINT32, BFUINT32, struct, addressof
@@ -211,6 +215,7 @@ TREQ_TIMER2 = 0x3d
 TREQ_TIMER3 = 0x3e
 TREQ_UNPACED = 0x3f
 
+
 # PAD_PINS =  [struct(PAD_BASE + n*PAD_PIN_WIDTH, PAD_REGS) for n in range(0,GPIO_PIN_COUNT)]
 # ADC_DEVICE = struct(ADC_BASE, ADC_REGS)
 # ADC_FIFO_ADDR = ADC_BASE + 0x0c
@@ -218,9 +223,6 @@ TREQ_UNPACED = 0x3f
 # GPIO_FUNC_SPI, GPIO_FUNC_UART, GPIO_FUNC_I2C = 1, 2, 3
 # GPIO_FUNC_PWM, GPIO_FUNC_SIO, GPIO_FUNC_PIO0 = 4, 5, 6
 # GPIO_FUNC_NULL = 0x1f
-
-
-PIO0_BASE
 
 
 class DMAChannel:
@@ -270,7 +272,7 @@ class DMAChannel:
         self._internals.READ_ADDR_REG = addressof(source)
         self._internals.WRITE_ADDR_REG = target
         self._internals.TRANS_COUNT_REG = len(source)
-        #self._internals.CTRL_TRIG.BSWAP = 1
+        # self._internals.CTRL_TRIG.BSWAP = 1
         self._internals.CTRL_TRIG.DATA_SIZE = data_size
         self._internals.CTRL_TRIG.INCR_WRITE = 0
         self._internals.CTRL_TRIG.INCR_READ = 1
@@ -340,14 +342,13 @@ class _DMA:
                 return ch
         return None
 
-
     @micropython.native
     def mem_2_mem(self, source, target, data_size: DMA_SIZE_32):
         return self.unused_channel().mem_2_mem(source, target, data_size=data_size)
 
     @micropython.native
-    def pio_2_mem(self, source, state_machine_id, data_size: DMA_SIZE_32):
-        return self.unused_channel().pio_2_mem(source, state_machine_id, data_size=data_size)
+    def mem_2_pio(self, source, state_machine_id, data_size: DMA_SIZE_32):
+        return self.unused_channel().mem_2_pio(source, state_machine_id, data_size=data_size)
 
 
 dma = _DMA(channels=DMA_CHAN_COUNT)
