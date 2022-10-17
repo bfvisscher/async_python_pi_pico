@@ -1,4 +1,4 @@
-#  Class and methods used to connect to Home Assistant via mqtt
+#  Class and methods used to connect to Home Assistant via hass_mqtt
 #
 #  Compatible with MQTT discovery!!
 #
@@ -9,8 +9,6 @@
 # without delays to the running coroutine
 
 
-
-
 import binascii
 import json
 import os
@@ -19,18 +17,19 @@ import machine
 import uasyncio
 
 hass_device = {
-    "identifiers": binascii.hexlify(machine.unique_id()),
+    "identifiers": os.uname()[0] + binascii.hexlify(machine.unique_id()).decode("utf-8"),
     "suggested_area": "Lab",
     "model": os.uname()[-1],
+    "name": os.uname()[0] + ' [' + binascii.hexlify(machine.unique_id()).decode("utf-8") + ']',
     "manufacturer": "Raspberry Pi Ltd",
     "sw_version": os.uname()[3]
 }
 
 
 class HomeAssistantEntity:
-
     def __init__(self, name, entity_type, ha: "HomeAssistantMQTT", config, initial_state=None, cmd_callback=None,
                  device=hass_device, qos=1):
+        config = config.copy()
         self.name = name
         self.entity_type = entity_type
 
@@ -40,12 +39,13 @@ class HomeAssistantEntity:
 
         self.qos = qos
         config['name'] = name
-        # if device is not None:
-        #    config['device'] = device
+        if device is not None:
+            config['device'] = device
 
         if "unique_id" not in config:
-            config['unique_id'] = binascii.hexlify(machine.unique_id()).decode(
-                "utf-8") + '_' + self.name.lower().replace(' ', '_')
+            config['unique_id'] = self.name.lower().replace(' ', '_') + '_' + binascii.hexlify(
+                machine.unique_id()).decode(
+                "utf-8")
 
         self.entity_topic = "%s/%s/%s" % (ha.topic_prefix, entity_type, config['unique_id'])
         if '~' not in config:
@@ -61,8 +61,8 @@ class HomeAssistantEntity:
                 config['stat_t'] = '~/state'
                 state_topic = config['~'] + '/state'
             self.state_topic = state_topic.replace('~', config['~'])
-            if len(initial_state) != 0:
-                self.publish_state()
+
+            self.publish_state()
 
         if cmd_callback is not None:
             if 'cmd_t' in config:
@@ -75,16 +75,30 @@ class HomeAssistantEntity:
             command_topic.replace('~', config['~'])
             self._ha.subscribe(command_topic, qos=1, callback=self)
 
-        # make configuration available for HA mqtt discovery
+        # remove any None entries
+        keys_to_delete = []
+        for k, v in config.items():
+            if v is None:
+                keys_to_delete.append(k)
+        for k in keys_to_delete:
+            del config[k]
+
+        # make configuration available for HA hass_mqtt discovery
         self._ha.publish(self.entity_topic + '/config', json.dumps(config), qos=1, retain=True)
-        self.config = config.copy()
+        self.config = config
 
     def publish_state(self):
         self._ha.publish(self.state_topic, json.dumps(self.state), qos=self.qos, retain=True)
 
     def __call__(self, message, retain):  # command topic messages
-        new_state = self.cmd_callback(self, json.loads(message))
-        if new_state:
+        try:
+            message = json.loads(message)
+        except:
+            message = message.decode('utf-8')  # convert to string
+
+        new_state = self.cmd_callback(self, message)
+
+        if new_state and self.entity_type not in ['button']:  # exclude non-state entity types
             self.state = new_state
             self.publish_state()
 
@@ -112,7 +126,7 @@ class HomeAssistantMQTT:
         config['wifi_pw'] = wifi_password
         config['subs_cb'] = self.mqtt_callback
         config['server'] = url_split[0]
-        config['port'] = int(url_split[1]) if len(url_split) == 2 else 1883  # default mqtt port
+        config['port'] = int(url_split[1]) if len(url_split) == 2 else 1883  # default hass_mqtt port
         config['user'] = user
         config['password'] = bytearray(password)
 

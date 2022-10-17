@@ -1,77 +1,103 @@
-import uasyncio
+from async_hass import HomeAssistantMQTT, HomeAssistantEntity
 
-import async_hass
+def HassSensor(mqtt, name, initial_state= 0, unit_of_measurement = "", icon="mdi:gauge",
+               **kwargs) -> HomeAssistantEntity:
+    """
+
+    :param mqtt: hass_mqtt hass_mqtt server
+    :param name: name of the entity
+    :param initial_state: assume this value
+    :param unit_of_measurement: to add %  or m/s etc.
+    :param icon: Name of the hass icon to use
+    :return:
+    """
+    hass_entity_config = {
+        "icon": icon,
+        "force_update" : True,
+        "unit_of_measurement" : unit_of_measurement,
+    }
+    hass_entity_config.update(**kwargs)
+    return HomeAssistantEntity(name, 'sensor', mqtt, hass_entity_config, initial_state, None, qos=0)
+
+def HassButton(mqtt: HomeAssistantMQTT, name, command_callback, icon="mdi:gesture-tap-button",
+               **kwargs) -> HomeAssistantEntity:
+    """
+
+    :param mqtt: hass_mqtt hass_mqtt server
+    :param name: name of the entity
+    :param command_callback: method to call upon receiving a change from hass_mqtt  (will ONLY receive 'PRESS')
+    :param icon: Name of the hass_mqtt icon to use
+    :return:
+    """
+    hass_entity_config = {
+        "icon": icon,
+        "optimistic": False,
+        "qos": 1,
+        "retain": False  # do not retain to avoid historical button presses when starting
+    }
+    hass_entity_config.update(**kwargs)
+    return HomeAssistantEntity(name, 'button', mqtt, hass_entity_config, None, command_callback)
 
 
-def hass_lightstrip(pixel_buffer, name, hass: async_hass.HomeAssistantMQTT, patterns=dict()):
-    if pixel_buffer.bpp == 3:
-        lightmode = "rgb"
-    else:
-        lightmode = "rgbw"
+def HassNumber(mqtt: HomeAssistantMQTT, name, command_callback, initial_value=0, min_value=0, max_value=100, step=1,
+               unit="", use_box=False, icon="mdi:speedometer", **kwargs) -> HomeAssistantEntity:
+    """
 
-    effect_list = list(patterns.keys())
+    :param mqtt: hass_mqtt hass_mqtt server
+    :param name: name of the entity
+    :param command_callback: method to call upon receiving a change from hass_mqtt
+    :param initial_value: initialise with this value
+    :param min_value: lowest value
+    :param max_value: highest value
+    :param step: minimum change
+    :param unit: Unit of the value being used
+    :param use_box: True to use numeric input, False to use slider
+    :param icon: Name of the hass_mqtt icon to use
+    :return:
+    """
+    hass_entity_config = {
+        "icon": icon,
+        "optimistic": False,
+        "qos": 1,
+        "min": min_value,
+        "max": max_value,
+        "step": step,
+        "mode": "box" if use_box else "slider",
+        "unit_of_measurement": unit,
+        "retain": True
+    }
+    hass_entity_config.update(**kwargs)
+    return HomeAssistantEntity(name, 'number', mqtt, hass_entity_config, initial_value,
+                               command_callback)
+
+
+def HassLight(mqtt: HomeAssistantMQTT, name, command_callback, color_mode=None, effect_list=[],
+              initial_state={"state": "OFF"}, icon="mdi:lightbulb-variant-outline", **kwargs) -> HomeAssistantEntity:
+    """
+    Create an entity representing a light
+
+    :param name: Name of the entity
+    :param mqtt: hass_mqtt server connected to home assistant
+    :param command_callback: function to be used when receiving commands from hass_mqtt
+    :param color_mode: supported colour modes ie 'onoff', 'brightness', 'color_temp', 'hs', 'xy', 'rgb', 'rgbw', 'rgbww', 'white'
+    :param effect_list: list of supported effects
+    :param initial_state:
+    :return:
+    """
 
     hass_entity_config = {
         "schema": "json",
         "effect_list": effect_list,
-        "color_mode": lightmode is not None,
-        "brightness": True,
+        "color_mode": color_mode is not None,
+        "brightness": 'onoff' != color_mode,  # all other modes support brightness
         "effect": len(effect_list) > 0,
-        "supported_color_modes": [lightmode],
-        "icon": "mdi:led-strip-variant",
+        "icon": icon,
         "optimistic": False,
         "qos": 1,
         "retain": True
     }
-
-    def command_callback(entity, command):
-
-        if command.get('effect', False) and command.get('state', 'OFF') == 'ON':
-            entity.pattern = True
-            #
-        if command.get('color', False):
-            entity.pattern = False
-
-        # update the following
-        for key in ['effect', 'brightness', 'color', 'state']:
-            if key in command:
-                entity.state[key] = command[key]
-
-        entity.new_command.set()
-        if entity.state['state'] == 'OFF':
-            entity.state = {'state': 'OFF'}  # clear of all other info
-        return entity.state
-
-    initial_state = {"state": "OFF"}
-
-    entity = async_hass.HomeAssistantEntity(name, 'light', hass, hass_entity_config, initial_state, command_callback)
-    entity.pattern = False
-    entity.new_command = uasyncio.Event()
-    current_pattern = None
-
-    if pixel_buffer.bpp == 3:
-        lightmode = "rgb"
-    else:
-        lightmode = "rgbw"
-
-    yield 0
-    while True:
-        if entity.pattern and entity.state['state'] == 'ON':
-            cur_time = 0
-            new_pattern = entity.state.get('effect', current_pattern)
-            if current_pattern != new_pattern and new_pattern in patterns:
-                active_pattern = patterns[new_pattern]
-                iterator = iter(active_pattern[0](pixel_buffer, **active_pattern[1]))
-                current_pattern = new_pattern
-            yield next(iterator)
-        else:
-            if entity.state['state'] == 'ON':
-                # colour has been send
-                brightness = entity.state.get('brightness', 255)
-                color = entity.state.get('color', {})
-                pixel_buffer.fill([brightness * color.get(c, 0) // 255 for c in lightmode])
-            else:
-                # state is OFF
-                pixel_buffer.fade(0)
-            entity.new_command.clear()
-            yield entity.new_command.wait()
+    if color_mode is not None:
+        hass_entity_config["supported_color_modes"] = color_mode
+    hass_entity_config.update(**kwargs)
+    return HomeAssistantEntity(name, 'light', mqtt, hass_entity_config, initial_state, command_callback,
+                               device=None)  # HASS doesn't recognise more than one light on the same device

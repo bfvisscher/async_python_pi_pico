@@ -2,17 +2,9 @@ import async_hass
 from async_drivers import *
 from async_runner import *
 from async_tasks import *
-from hass_entities import hass_lightstrip
 from patterns import *
 import json
 
-
-PICO_W = True
-
-if PICO_W:
-    ON_BOARD_PIN = 'LED'
-else:
-    ON_BOARD_PIN = 25
 
 pin_strip_upper = 27
 pin_strip_lower = 6
@@ -22,13 +14,11 @@ blackboard = {}  # used to create a shared variable space
 with open('secrets.json', 'rt') as f:
     secrets = json.load(f)
 
-hass = async_hass.HomeAssistantMQTT('192.168.68.11:1883', secrets['mqtt.username'], secrets['mqtt.password'], secrets['wifi.ssid'], secrets['wifi.password'])
+hass_mqtt = async_hass.HomeAssistantMQTT('192.168.68.11:1883', secrets['mqtt.username'], secrets['mqtt.password'], secrets['wifi.ssid'], secrets['wifi.password'])
 
-networklogins = {secrets['wifi.ssid']: secrets['wifi.password']}
-# add_task(connect_wifi, networklogins)
+add_task(cpu_load, mqtt=hass_mqtt, time_between_report_ms=5000)
+add_task(heartbeat)
 
-
-add_task(cpu_load)
 ledstrip_driver = neo_driver_dma
 
 # add_task(pin_driver, [ON_BOARD_PIN], blink, pixel=1)
@@ -103,9 +93,9 @@ strip2_patterns = {
 # selection of the pattern
 
 # execution of the patterns
-add_task(ledstrip_driver, pin_strip_upper, hass_lightstrip, name='Lightstrip Door', hass=hass,
+add_task(ledstrip_driver, pin_strip_upper, hass_lightstrip, name='Lightstrip Door', mqtt=hass_mqtt,
          patterns=strip1_patterns, n=144, bpp=3, state_machine=0)
-add_task(ledstrip_driver, pin_strip_lower, hass_lightstrip, name='Lightstrip Stairs', hass=hass,
+add_task(ledstrip_driver, pin_strip_lower, hass_lightstrip, name='Lightstrip Stairs', mqtt=hass_mqtt,
          patterns=strip2_patterns, n=300, bpp=4, state_machine=1)
 
 # add_task(ledstrip_driver, pin_strip_lower, kit, pixel=[0, 0, 0, 255], n=300, bpp=4, freq=60, fade=.9, state_machine=1)  # 57%

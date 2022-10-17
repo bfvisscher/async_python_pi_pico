@@ -1,19 +1,18 @@
 from machine import Pin
 
 from async_runner import add_task, start_tasks
+from gbl import ON_BOARD_LED_PIN
 
 
 # now that we added a single task, lets add on more to see how easy it is.
 
-# setup : add an LED on pin 15
-
+# hardware setup : add an LED on pin 16
 
 # Define the tasks ***********************************************************
 
-# simple example of a blinking LED with
 
 def blinking_on_board():
-    pin = Pin(25, Pin.OUT)  # 25 for on-board LED  (or 'LED' when using Pi Pico W)
+    pin = Pin(ON_BOARD_LED_PIN, Pin.OUT)  # 25 for on-board LED  (or 'LED' when using Pi Pico W)
     while True:
         pin.on()
         yield 200
@@ -22,7 +21,7 @@ def blinking_on_board():
 
 
 def blinking_led():
-    pin = Pin(15, Pin.OUT)
+    pin = Pin(16, Pin.OUT)
     while True:
         pin.on()
         yield 200

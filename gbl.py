@@ -1,3 +1,4 @@
+import os
 import time
 
 
@@ -12,6 +13,7 @@ make_slice = MakeSlice()
 
 
 # use make_slice[1:-1] to make a slice object
+
 
 def timed_function(f, *args, **kwargs):
     myname = str(f)
@@ -29,3 +31,8 @@ def timed_function(f, *args, **kwargs):
         return result
 
     return new_func
+
+
+PICO_W = 'Pico W' in os.uname()[-1]
+
+ON_BOARD_LED_PIN = 'LED' if PICO_W else 25

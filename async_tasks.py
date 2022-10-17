@@ -6,6 +6,7 @@ import uasyncio
 from machine import Pin
 
 from async_runner import as_pwm
+from gbl import ON_BOARD_LED_PIN
 
 
 def rgb_led_random(rgb_pins, delay_ms=200, start_delay_ms=0, freq_pwm=10_000):
@@ -36,8 +37,12 @@ def random_item_selector(black_board, entry, items, switch_time_ms, repetition=F
         yield switch_time_ms
 
 
-def cpu_load(time_between_report_ms=1000):
+def cpu_load(time_between_report_ms=1000, mqtt=None):
     # idle_load = 417.7  # 417.0 # compensate for regular overhead of async
+    if mqtt is not None:
+        from hass_entities import HassSensor
+        cpu_sensor = HassSensor(mqtt, "CPU utilization", 0, unit_of_measurement="%", icon="mdi:cpu-64-bit")
+
     idle_load = None
     gc.disable()
     load = 80
@@ -74,7 +79,12 @@ def cpu_load(time_between_report_ms=1000):
         # print("loopsit id  : %i   idle: %i    self : %i    Out : %i" % (
         # loop, self.idle_load, total_self_time, total_out_time))
         load = 100 - 100 * (total_self_time + (loop * idle_load)) / (total_out_time + total_self_time)
-        print('CPU load: %2.1f%%  RAM free %d RAM alloc %d' % (load, gc.mem_free(), gc.mem_alloc()))
+
+        if mqtt is not None:
+            cpu_sensor.state = round(load, 0)
+            cpu_sensor.publish_state()
+        else:
+            print('CPU load: %2.1f%%  RAM free %d RAM alloc %d' % (load, gc.mem_free(), gc.mem_alloc()))
 
 
 def button_press(pin_id, event: uasyncio.Event, debounce_delay_ms=10):
@@ -102,7 +112,7 @@ def button_press(pin_id, event: uasyncio.Event, debounce_delay_ms=10):
                 _value = 0
 
 
-def heartbeat(pin):
+def heartbeat(pin=ON_BOARD_LED_PIN):
     pin = Pin(pin, Pin.OUT)
     while True:
         pin.value(1)

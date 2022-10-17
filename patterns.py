@@ -1,8 +1,71 @@
 import random
 import time
 
+import uasyncio
+
+import hass_entities
 from gbl import make_slice
 from pixel_buffers import PixelBuffer, PixelBufferSegment
+
+
+def hass_lightstrip(pixel_buffer, name, mqtt: hass_entities.HomeAssistantMQTT, patterns=dict()):
+    if pixel_buffer.bpp == 3:
+        color_mode = "rgb"
+    else:
+        color_mode = "rgbw"
+
+    effect_list = list(patterns.keys())
+
+    def command_callback(entity, command):
+
+        if command.get('effect', False) and command.get('state', 'OFF') == 'ON':
+            entity.pattern = True
+            #
+        if command.get('color', False):
+            entity.pattern = False
+
+        # update the following
+        for key in ['effect', 'brightness', 'color', 'state']:
+            if key in command:
+                entity.state[key] = command[key]
+
+        entity.new_command.set()
+        if entity.state['state'] == 'OFF':
+            entity.state = {'state': 'OFF'}  # clear of all other info
+        return entity.state
+
+    entity = hass_entities.HassLight(mqtt=mqtt, name=name, command_callback=command_callback, effect_list=effect_list,
+                                     color_mode=color_mode, icon="mdi:led-strip-variant")
+    entity.pattern = False
+    entity.new_command = uasyncio.Event()
+    current_pattern = None
+
+    if pixel_buffer.bpp == 3:
+        lightmode = "rgb"
+    else:
+        lightmode = "rgbw"
+
+    yield 0
+    while True:
+        if entity.pattern and entity.state['state'] == 'ON':
+            cur_time = 0
+            new_pattern = entity.state.get('effect', current_pattern)
+            if current_pattern != new_pattern and new_pattern in patterns:
+                active_pattern = patterns[new_pattern]
+                iterator = iter(active_pattern[0](pixel_buffer, **active_pattern[1]))
+                current_pattern = new_pattern
+            yield next(iterator)
+        else:
+            if entity.state['state'] == 'ON':
+                # colour has been send
+                brightness = entity.state.get('brightness', 255)
+                color = entity.state.get('color', {})
+                pixel_buffer.fill([brightness * color.get(c, 0) // 255 for c in lightmode])
+            else:
+                # state is OFF
+                pixel_buffer.fade(0)
+            entity.new_command.clear()
+            yield entity.new_command.wait()
 
 
 def select_pattern(pixel_buffer, patterns, black_board, entry, freq=30):

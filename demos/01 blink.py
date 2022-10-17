@@ -1,6 +1,11 @@
 from machine import Pin
 
 from async_runner import add_task, start_tasks
+from gbl import ON_BOARD_LED_PIN
+
+# ON_BOARD_LED_PIN is automatically set to the internal LED pin.
+# that is pin 25 for the Pi Pico or 'LED' when using Pi Pico W)
+
 
 
 # This library implements async methods to make development easier
@@ -15,7 +20,7 @@ from async_runner import add_task, start_tasks
 # simple example of a blinking LED
 
 def blinking():
-    pin = Pin(25, Pin.OUT)  # 25 for on-board LED  (or 'LED' when using Pi Pico W)
+    pin = Pin(ON_BOARD_LED_PIN, Pin.OUT)
     while True:
         pin.on()
         yield 200  # instead of saying sleep_ms(200), use yield, this time can now be used by other processes
