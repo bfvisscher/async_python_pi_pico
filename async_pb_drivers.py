@@ -1,3 +1,8 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 import rp2
 from machine import Pin, bitstream
 
@@ -53,9 +58,7 @@ def neo_driver_bitstream(pin, pattern_fcn, n, bpp=3, timing=1, **kwargs):
         yield delay_ms
 
 
-
 def neo_driver_pio(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
-
     if bpp == 3:
         pio_driver = __WS282B__
     elif bpp == 4:

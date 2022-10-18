@@ -105,8 +105,8 @@ class MQTT_base:
             raise ValueError('invalid keepalive time')
         self._response_time = config['response_time'] * 1000  # Repub if no PUBACK received (ms).
         self._max_repubs = config['max_repubs']
-        self._clean_init = config['clean_init']  # clean_session state on first connection
-        self._clean = config['clean']  # clean_session state on reconnect
+        self._clean_init = config['clean_init']  # clean_session _rotary_state on first connection
+        self._clean = config['clean']  # clean_session _rotary_state on reconnect
         will = config['will']
         if will is None:
             self._lw_topic = False
@@ -499,7 +499,7 @@ class MQTT_base:
 class MQTTClient(MQTT_base):
     def __init__(self, config):
         super().__init__(config)
-        self._isconnected = False  # Current connection state
+        self._isconnected = False  # Current connection _rotary_state
         keepalive = 1000 * self._keepalive  # ms
         self._ping_interval = keepalive // 4 if keepalive else 20000
         p_i = config['ping_interval'] * 1000  # Can specify shorter e.g. for subscribe-only
@@ -551,7 +551,7 @@ class MQTTClient(MQTT_base):
                 elif RP2:  # 1 is STAT_CONNECTING. 2 reported by user (No IP?)
                     if not 1 <= s.status() <= 2:
                         break
-            else:  # Timeout: still in connecting state
+            else:  # Timeout: still in connecting _rotary_state
                 s.disconnect()
                 await asyncio.sleep(1)
 

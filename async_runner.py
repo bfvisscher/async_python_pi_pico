@@ -1,8 +1,12 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 import time
 
 import uasyncio
 from machine import Pin, PWM
-
 
 
 def as_pins(pin_ids, *nargs, **kwargs):
@@ -34,7 +38,7 @@ async def _run(fcn, *nargs, **kwargs) -> None:
         else:
             await item
             last_wait_time = time.ticks_ms()
-            
+
 
 def wait_for(fcn, *nargs, **kwargs):
     async def __converted_to_async(fcn, *nargs, **kwargs):

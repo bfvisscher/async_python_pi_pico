@@ -1,6 +1,12 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 from async_hass import HomeAssistantMQTT, HomeAssistantEntity
 
-def HassSensor(mqtt, name, initial_state= 0, unit_of_measurement = "", icon="mdi:gauge",
+
+def HassSensor(mqtt, name, initial_state=0, unit_of_measurement="", icon="mdi:gauge",
                **kwargs) -> HomeAssistantEntity:
     """
 
@@ -13,11 +19,12 @@ def HassSensor(mqtt, name, initial_state= 0, unit_of_measurement = "", icon="mdi
     """
     hass_entity_config = {
         "icon": icon,
-        "force_update" : True,
-        "unit_of_measurement" : unit_of_measurement,
+        "force_update": True,
+        "unit_of_measurement": unit_of_measurement,
     }
     hass_entity_config.update(**kwargs)
     return HomeAssistantEntity(name, 'sensor', mqtt, hass_entity_config, initial_state, None, qos=0)
+
 
 def HassButton(mqtt: HomeAssistantMQTT, name, command_callback, icon="mdi:gesture-tap-button",
                **kwargs) -> HomeAssistantEntity:
@@ -25,7 +32,7 @@ def HassButton(mqtt: HomeAssistantMQTT, name, command_callback, icon="mdi:gestur
 
     :param mqtt: hass_mqtt hass_mqtt server
     :param name: name of the entity
-    :param command_callback: method to call upon receiving a change from hass_mqtt  (will ONLY receive 'PRESS')
+    :param command_callback: method to call upon receiving a events from hass_mqtt  (will ONLY receive 'PRESS')
     :param icon: Name of the hass_mqtt icon to use
     :return:
     """
@@ -45,11 +52,11 @@ def HassNumber(mqtt: HomeAssistantMQTT, name, command_callback, initial_value=0,
 
     :param mqtt: hass_mqtt hass_mqtt server
     :param name: name of the entity
-    :param command_callback: method to call upon receiving a change from hass_mqtt
+    :param command_callback: method to call upon receiving a events from hass_mqtt
     :param initial_value: initialise with this value
     :param min_value: lowest value
     :param max_value: highest value
-    :param step: minimum change
+    :param step: minimum events
     :param unit: Unit of the value being used
     :param use_box: True to use numeric input, False to use slider
     :param icon: Name of the hass_mqtt icon to use
@@ -72,7 +79,7 @@ def HassNumber(mqtt: HomeAssistantMQTT, name, command_callback, initial_value=0,
 
 
 def HassLight(mqtt: HomeAssistantMQTT, name, command_callback, color_mode=None, effect_list=[],
-              initial_state={"state": "OFF"}, icon="mdi:lightbulb-variant-outline", **kwargs) -> HomeAssistantEntity:
+              initial_state={"_rotary_state": "OFF"}, icon="mdi:lightbulb-variant-outline", **kwargs) -> HomeAssistantEntity:
     """
     Create an entity representing a light
 

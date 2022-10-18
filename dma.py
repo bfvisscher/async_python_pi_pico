@@ -1,3 +1,8 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 #   This file is a work in progress
 #   The aim is to have different types of dma transfers readily available
 #   to and from all the different options ie

@@ -1,3 +1,8 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 import network
 
 
@@ -7,7 +12,7 @@ def connect_wifi(network_logins, idle_when_connected_ms=1000, rescan=False):
 
     :param network_logins: dictionary with ssid : password combinations
     :param idle_when_connected_ms: time to sleep between checking network connection
-    :param rescan: when available networks is likely to change (ie moving between zone), enable rescan
+    :param rescan: when available networks is likely to events (ie moving between zone), enable rescan
     :return:
     """
     wlan = network.WLAN(network.STA_IF)

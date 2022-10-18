@@ -1,12 +1,25 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 import gc
 import random
 import time
 
 import uasyncio
-from machine import Pin
+from machine import Pin, WDT
 
 from async_runner import as_pwm
 from gbl import ON_BOARD_LED_PIN
+
+
+def reset_if_unresponsive(unresponsive_ms=2000):
+    wdt = WDT(timeout=unresponsive_ms)
+    unresponsive_ms >>= 1
+    while True:
+        yield unresponsive_ms
+        wdt.feed()
 
 
 def rgb_led_random(rgb_pins, delay_ms=200, start_delay_ms=0, freq_pwm=10_000):
@@ -87,31 +100,6 @@ def cpu_load(time_between_report_ms=1000, mqtt=None):
             print('CPU load: %2.1f%%  RAM free %d RAM alloc %d' % (load, gc.mem_free(), gc.mem_alloc()))
 
 
-def button_press(pin_id, event: uasyncio.Event, debounce_delay_ms=10):
-    super().__init__()
-    input_pin = Pin(pin_id, Pin.IN)
-    irq_event = uasyncio.ThreadSafeFlag()
-
-    def irq_handler(pin: int):
-        irq_event.set()
-
-    input_pin.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=irq_handler)
-    _value = 0
-    while True:
-        yield irq_event.wait()
-        if not input_pin.value():  # check if button is changing to on or off
-            yield debounce_delay_ms  # delay in case of bounce
-            if not input_pin.value() and not _value:  # set to 0 when pressed
-                # print('button pressed')
-                _value = 1
-                event.set()
-        else:
-            yield debounce_delay_ms  # delay in case of bounce
-            if input_pin.value() and _value:
-                # print('button released')
-                _value = 0
-
-
 def heartbeat(pin=ON_BOARD_LED_PIN):
     pin = Pin(pin, Pin.OUT)
     while True:
@@ -130,6 +118,12 @@ class SignalTimer:
     TIME_LOW = 0
 
     def __init__(self, signal_pin, callback, measure=1, hard=False):
+        """
+        :param signal_pin: Pin to monitor for signal
+        :param callback:  fn( measurement:int ) -> None     measurement is an integer of time difference (us)
+        :param measure (SignalTimer.TIME_HIGH):  measure either  SignalTimer.TIME_HIGH or  SignalTimer.TIME_LOW
+        :param hard:(False)  Use hardware interrupt (more accurate but only few available) or software interrupt (false)
+        """
         self.signal_pin = Pin(signal_pin, Pin.IN, Pin.PULL_DOWN if measure == SignalTimer.TIME_HIGH else Pin.PULL_UP)
 
         self.measure = measure
@@ -140,13 +134,15 @@ class SignalTimer:
         self.signal_pin.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.irq_handler, hard=hard)
         uasyncio.create_task(self())
 
+    @micropython.native
     async def __call__(self):
         while True:
             await self.event.wait()
             if self.start < self.stop:
                 self._cb(self.measurement())
 
-    def measurement(self):  # duration by default        
+    @micropython.native
+    def measurement(self):  # duration by default
         return time.ticks_diff(self.stop, self.start)
 
     @micropython.viper

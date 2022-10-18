@@ -1,4 +1,10 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 import rp2
+
 
 @rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
 def __WS282B__():
@@ -17,7 +23,7 @@ def __WS282B__():
     nop().side(0)[T2 - 1]
 
 
-# PIO state machine for RGBW. Pulls 32 bits (rgbw -> 4 * 8bit) automatically
+# PIO _rotary_state machine for RGBW. Pulls 32 bits (rgbw -> 4 * 8bit) automatically
 @rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=32)
 def __SK6812__():
     T1 = 2

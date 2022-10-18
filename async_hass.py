@@ -1,3 +1,8 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 #  Class and methods used to connect to Home Assistant via hass_mqtt
 #
 #  Compatible with MQTT discovery!!
@@ -16,6 +21,8 @@ import os
 import machine
 import uasyncio
 
+# from copy import deepcopy
+
 hass_device = {
     "identifiers": os.uname()[0] + binascii.hexlify(machine.unique_id()).decode("utf-8"),
     "suggested_area": "Lab",
@@ -29,7 +36,11 @@ hass_device = {
 class HomeAssistantEntity:
     def __init__(self, name, entity_type, ha: "HomeAssistantMQTT", config, initial_state=None, cmd_callback=None,
                  device=hass_device, qos=1):
-        config = config.copy()
+        if isinstance(config, (dict, list)):
+            config = config.copy()
+        if isinstance(initial_state, (dict, list)):
+            initial_state = initial_state.copy()
+
         self.name = name
         self.entity_type = entity_type
 
@@ -53,16 +64,16 @@ class HomeAssistantEntity:
 
         if initial_state is not None:
             self.state = initial_state
-            if 'stat_t' in config:
-                state_topic = config['stat_t']
-            elif 'state_topic' in config:
-                state_topic = config['state_topic']
-            else:
-                config['stat_t'] = '~/state'
-                state_topic = config['~'] + '/state'
-            self.state_topic = state_topic.replace('~', config['~'])
+        if 'stat_t' in config:
+            state_topic = config['stat_t']
+        elif 'state_topic' in config:
+            state_topic = config['state_topic']
+        else:
+            config['stat_t'] = '~/_rotary_state'
+        state_topic = config['~'] + '/_rotary_state'
+        self.state_topic = state_topic.replace('~', config['~'])
 
-            self.publish_state()
+        self.publish_state()
 
         if cmd_callback is not None:
             if 'cmd_t' in config:
@@ -71,9 +82,9 @@ class HomeAssistantEntity:
                 command_topic = config['command_topic']
             else:
                 config['cmd_t'] = '~/cmd'
-                command_topic = config['~'] + '/cmd'
-            command_topic.replace('~', config['~'])
-            self._ha.subscribe(command_topic, qos=1, callback=self)
+        command_topic = config['~'] + '/cmd'
+        command_topic.replace('~', config['~'])
+        self._ha.subscribe(command_topic, qos=1, callback=self)
 
         # remove any None entries
         keys_to_delete = []
@@ -98,7 +109,7 @@ class HomeAssistantEntity:
 
         new_state = self.cmd_callback(self, message)
 
-        if new_state and self.entity_type not in ['button']:  # exclude non-state entity types
+        if new_state and self.entity_type not in ['button']:  # exclude non-_rotary_state entity types
             self.state = new_state
             self.publish_state()
 

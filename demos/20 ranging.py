@@ -2,12 +2,6 @@ from async_hcsr04 import ranging_HCSR04
 from async_runner import *
 from async_tasks import cpu_load, heartbeat
 
-PICO_W = True
-if PICO_W:
-    ON_BOARD_PIN = 'LED'
-else:
-    ON_BOARD_PIN = 25
-
 
 # class to handle the callback when ranging returns a new value
 class UpdateDistance:
@@ -25,7 +19,7 @@ class UpdateDistance:
 
 
 add_task(cpu_load)  # show CPU usage while running
-add_task(heartbeat, pin=ON_BOARD_PIN)  # show the on-board LED blinking to indicate activity
+add_task(heartbeat)  # show the on-board LED blinking to indicate activity
 
 add_task(ranging_HCSR04, trigger_pin=19, echo_pin=18, callback=UpdateDistance().update_distance, delay_ms=50)
 

@@ -27,7 +27,7 @@ def blinking_led(pin_id, on_time_ms=200, off_time_ms=800):
 # Add the tasks ****************************************************************
 
 # 25 for on-board LED  (or 'LED' when using Pi Pico W)
-# change the blinking to twice per second
+# events the blinking to twice per second
 add_task(blinking_led, pin_id=ON_BOARD_LED_PIN, on_time_ms=100, off_time_ms=400)
 
 add_task(blinking_led, pin_id=16)  # use default parameters

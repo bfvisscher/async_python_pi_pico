@@ -1,3 +1,8 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 import _thread
 import time
 
@@ -33,7 +38,7 @@ class __CPU2:
                     task = None
                 else:
                     task = self.tasks.pop()
-            if task is not None:                
+            if task is not None:
                 task[1](*task[2], **task[3])
                 with self.task_lock:
                     self.completed = task[0]

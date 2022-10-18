@@ -1,3 +1,8 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 import array
 
 import micropython
@@ -47,6 +52,8 @@ class PixelBuffer:
 
     @micropython.native
     def __getitem__(self, i):
+        if i >= self.n:
+            i = self.n - 1
         return self.buf[i]
 
     @micropython.native
@@ -193,7 +200,11 @@ class PixelBufferNeo(PixelBuffer):
             buf[i] = tmp[0]
 
     @micropython.viper
-    def __getitem__(self, i):
+    def __getitem__(self, i: int):
+        n = int(self.n)
+
+        if i >= n:
+            i = i - 1
         self.out_convert(i)
         return self.tmp_buf
 
