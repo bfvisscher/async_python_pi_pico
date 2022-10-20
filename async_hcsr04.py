@@ -17,7 +17,7 @@ class HCSR04(SignalTimer):
 
 def ranging_HCSR04(trigger_pin, echo_pin, callback, delay_ms=50):
     trigger_pin = Pin(trigger_pin, Pin.OUT, 0)
-    HCSR04(echo_pin, callback, SignalTimer.TIME_HIGH, hard=True)
+    HCSR04(echo_pin, callback, measure=SignalTimer.TIME_HIGH, hard=True)
     while True:
         trigger_pin.value(1)
         time.sleep_us(10)
