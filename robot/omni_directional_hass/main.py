@@ -1,5 +1,10 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
 import json
 import time
+
 from machine import Pin
 
 import async_hass
@@ -20,20 +25,19 @@ hass_mqtt = async_hass.HomeAssistantMQTT('192.168.68.11:1883', secrets['mqtt.use
 
 
 class OmniPlatform:
-    def __init__(self, stall_zone=.3, freq=1000, hass_mqtt = None):
+    def __init__(self, stall_zone=.3, freq=1000, hass_mqtt=None):
 
-        
         self.hs_speed = HassNumber(hass_mqtt, 'Speed', self.speed, initial_value=0, min_value=-1,
-                              max_value=1, step=.05, use_box=False)
+                                   max_value=1, step=.05, use_box=False)
         self.hs_strafe = HassNumber(hass_mqtt, 'Strafe', self.strafe, initial_value=0, min_value=-1,
-                               max_value=1, step=.05, use_box=False)
+                                    max_value=1, step=.05, use_box=False)
         self.hs_rotation = HassNumber(hass_mqtt, 'Rotation', self.rotation, initial_value=0, min_value=-1,
-                                 max_value=1, step=.05, use_box=False)
+                                      max_value=1, step=.05, use_box=False)
 
         self.power_limiter = HassNumber(hass_mqtt, 'Power Limit', self.power_limit, initial_value=.30, min_value=.3,
-                                   max_value=1, step=.05, use_box=False)
+                                        max_value=1, step=.05, use_box=False)
         self.stall_zone = HassNumber(hass_mqtt, 'Stall Zone', self.stall_zone, initial_value=.3, min_value=0,
-                                max_value=.9, step=.05, use_box=False)
+                                     max_value=.9, step=.05, use_box=False)
 
         stop_button = HassButton(hass_mqtt, 'Stop', self.stop)
 
@@ -44,7 +48,6 @@ class OmniPlatform:
 
         self.wheels = [self.wheel_rf, self.wheel_lf, self.wheel_rb, self.wheel_lb]
         self._power_limit = 1
-
 
     def test_wheels(self):
         for wh in self.wheels:
@@ -57,7 +60,6 @@ class OmniPlatform:
             print('Stop')
             wh.throttle(0)
             time.sleep(2)
-    
 
     def set_throttle(self, values):
         for w, v in zip(self.wheels, values):
@@ -91,7 +93,7 @@ class OmniPlatform:
         self.hs_speed.publish_state()
         self.hs_strafe.state = 0
         self.hs_strafe.publish_state()
-        
+
         return command
 
     def rotary_knob(self, event):
@@ -116,19 +118,18 @@ class OmniPlatform:
         self.hs_rotation.publish_state()
         self.hs_strafe.state = 0
         self.hs_strafe.publish_state()
-            
-
-def mobile_platform(hass_mqtt, stall_zone=.4, freq=5000):
-    op = OmniPlatform(hass_mqtt=hass_mqtt)
 
 
-    range_sensor = HassSensor(hass_mqtt, 'Range', unit_of_measurement='cm')    
+def mobile_platform(hass_mqtt, stall_zone=.3, freq=1000):
+    op = OmniPlatform(hass_mqtt=hass_mqtt, stall_zone=stall_zone, freq=freq)
 
+    range_sensor = HassSensor(hass_mqtt, 'Range', unit_of_measurement='cm')
 
     def ranging_cb(measure):
         range_sensor.state = measure
         range_sensor.publish_state()
 
+    # platform also has a rotary encoder just to see if it works in nrt (near real time) ;)
     rot = KY040(clk_pin=20, dt_pin=19, sw_pin=18, callback=op.rotary_knob)
 
     trigger_pin = Pin(26, Pin.OUT, 0)
@@ -138,27 +139,14 @@ def mobile_platform(hass_mqtt, stall_zone=.4, freq=5000):
     delay_ms = 125
     yield 1000
     while True:
-        for angle in range(0, 90, step):
-            servo.angle = angle
-            yield delay_ms - 10
-            trigger_pin.value(1)
-            yield 10
-            trigger_pin.value(0)
-            yield delay_ms
-        for angle in range(90, -90, -step):
-            servo.angle = angle
-            yield delay_ms - 10
-            trigger_pin.value(1)
-            yield 10
-            trigger_pin.value(0)
-            yield delay_ms
-        for angle in range(-90, 0, step):
-            servo.angle = angle
-            yield delay_ms - 10
-            trigger_pin.value(1)
-            yield 10
-            trigger_pin.value(0)
-            yield delay_ms
+        for st in [(0, 90, step), (90, -90, -step), (-90, 0, step)]:
+            for angle in range(*st):
+                servo.angle = angle
+                yield delay_ms - 10  # time for servo to reach new position
+                trigger_pin.value(1)  # do some ranging
+                yield 10
+                trigger_pin.value(0)
+                yield delay_ms  # time to receive echo signal
 
 
 add_task(mobile_platform, hass_mqtt)

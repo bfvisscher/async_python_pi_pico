@@ -1,3 +1,8 @@
+# MIT License (MIT)
+# Copyright (c) 2022 Bart-Floris Visscher
+# https://opensource.org/licenses/MIT
+
+
 from machine import Pin, PWM
 
 
@@ -56,7 +61,7 @@ class DCMotor:
         duty = min(65535, int(65536 * (self._stall_zone + (1 - self._stall_zone) * power)))
         self.enable_pin.duty_u16(duty)
 
-    def throttle(self, power:float):
+    def throttle(self, power: float):
         """
         Sets both direction and power by using (-1, +1)
         :param power:
