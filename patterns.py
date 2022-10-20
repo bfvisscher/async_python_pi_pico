@@ -23,21 +23,21 @@ def hass_lightstrip(pixel_buffer, name, mqtt: hass_entities.HomeAssistantMQTT, p
 
     def command_callback(entity, command):
 
-        if command.get('effect', False) and command.get('_rotary_state', 'OFF') == 'ON':
+        if command.get('effect', False) and command.get('state', 'OFF') == 'ON':
             entity.pattern = True
             #
         if command.get('color', False):
             entity.pattern = False
 
         # update the following
-        for key in ['effect', 'brightness', 'color', '_rotary_state']:
+        for key in ['effect', 'brightness', 'color', 'state']:
             if key in command:
-                entity._rotary_state[key] = command[key]
+                entity.state[key] = command[key]
 
         entity.new_command.set()
-        if entity._rotary_state['_rotary_state'] == 'OFF':
-            entity._rotary_state = {'_rotary_state': 'OFF'}  # clear of all other info
-        return entity._rotary_state
+        if entity.state['state'] == 'OFF':
+            entity.state = {'state': 'OFF'}  # clear of all other info
+        return entity.state
 
     entity = hass_entities.HassLight(mqtt=mqtt, name=name, command_callback=command_callback, effect_list=effect_list,
                                      color_mode=color_mode, icon="mdi:led-strip-variant")
@@ -47,7 +47,7 @@ def hass_lightstrip(pixel_buffer, name, mqtt: hass_entities.HomeAssistantMQTT, p
 
     yield 0
     while True:
-        if entity.pattern and entity.state['_rotary_state'] == 'ON':
+        if entity.pattern and entity.state['state'] == 'ON':
             cur_time = 0
             new_pattern = entity.state.get('effect', current_pattern)
             if current_pattern != new_pattern and new_pattern in patterns:
@@ -56,13 +56,13 @@ def hass_lightstrip(pixel_buffer, name, mqtt: hass_entities.HomeAssistantMQTT, p
                 current_pattern = new_pattern
             yield next(iterator)
         else:
-            if entity.state['_rotary_state'] == 'ON':
+            if entity.state['state'] == 'ON':
                 # colour has been send
                 brightness = entity.state.get('brightness', 255)
                 color = entity.state.get('color', {})
                 pixel_buffer.fill([brightness * color.get(c, 0) // 255 for c in color_mode])
             else:
-                # _rotary_state is OFF
+                # state is OFF
                 pixel_buffer.fade(0)
             entity.new_command.clear()
             yield entity.new_command.wait()

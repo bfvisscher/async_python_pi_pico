@@ -69,8 +69,8 @@ class HomeAssistantEntity:
         elif 'state_topic' in config:
             state_topic = config['state_topic']
         else:
-            config['stat_t'] = '~/_rotary_state'
-        state_topic = config['~'] + '/_rotary_state'
+            config['stat_t'] = '~/state'
+            state_topic = '~/state'
         self.state_topic = state_topic.replace('~', config['~'])
 
         self.publish_state()
@@ -82,9 +82,9 @@ class HomeAssistantEntity:
                 command_topic = config['command_topic']
             else:
                 config['cmd_t'] = '~/cmd'
-        command_topic = config['~'] + '/cmd'
-        command_topic.replace('~', config['~'])
-        self._ha.subscribe(command_topic, qos=1, callback=self)
+                command_topic = '~/cmd'
+            self.command_topic = command_topic.replace('~', config['~'])
+            self._ha.subscribe(self.command_topic, qos=1, callback=self)
 
         # remove any None entries
         keys_to_delete = []
@@ -109,7 +109,7 @@ class HomeAssistantEntity:
 
         new_state = self.cmd_callback(self, message)
 
-        if new_state and self.entity_type not in ['button']:  # exclude non-_rotary_state entity types
+        if new_state and self.entity_type not in ['button']:  # exclude non-state entity types
             self.state = new_state
             self.publish_state()
 
@@ -162,13 +162,14 @@ class HomeAssistantMQTT:
         await self.connect(**self._mqtt_connect)
         while True:
             await self.anything_todo.wait()
+
             while len(self.publish_queue) > 0 or len(self.subscribe_queue) > 0:
-                if len(self.publish_queue) > 0:
-                    msg = self.publish_queue.pop(0)
-                    await self._mqtt_client.publish(*msg)
-                elif len(self.subscribe_queue) > 0:
+                if len(self.subscribe_queue) > 0:
                     msg = self.subscribe_queue.pop(0)
                     await self._mqtt_client.subscribe(*msg)
-                # await uasyncio.sleep_ms(10) # small pause to let messages be processed
+                elif len(self.publish_queue) > 0:
+                    msg = self.publish_queue.pop(0)
+                    await self._mqtt_client.publish(*msg)
+                await uasyncio.sleep_ms(5)  # small pause to let messages be processed
 
             self.anything_todo.clear()

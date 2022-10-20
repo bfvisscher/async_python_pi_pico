@@ -12,12 +12,12 @@ from pio_state_machines import __WS282B__, __SK6812__
 from pixel_buffers import PixelBufferPWM, PixelBufferNeo, PixelBuffer
 
 
-def pin_driver(pin_ids, pattern_fcn, **kwargs):
+def pin_driver(pin_ids, pattern, **kwargs):
     pins = as_pins(pin_ids, Pin.OUT)
 
     pixel_buffer = PixelBuffer(len(pins))
 
-    for delay_ms in pattern_fcn(pixel_buffer=pixel_buffer, **kwargs):
+    for delay_ms in pattern(pixel_buffer=pixel_buffer, **kwargs):
 
         # send buffer to pwm pins
         for pin, pixel in zip(pins, pixel_buffer):
@@ -26,12 +26,12 @@ def pin_driver(pin_ids, pattern_fcn, **kwargs):
         yield delay_ms
 
 
-def pwm_driver(pin_ids, pattern_fcn, freq_pwm=10_000, **kwargs):
+def pwm_driver(pin_ids, pattern, freq_pwm=10_000, **kwargs):
     pwm_pins = as_pwm(pin_ids=pin_ids, freq_pwm=freq_pwm)
 
     pixel_buffer = PixelBufferPWM(len(pwm_pins))
 
-    for delay_ms in pattern_fcn(pixel_buffer=pixel_buffer, **kwargs):
+    for delay_ms in pattern(pixel_buffer=pixel_buffer, **kwargs):
 
         # send buffer to pwm pins
         for pin, pixel in zip(pwm_pins, pixel_buffer):
@@ -40,7 +40,7 @@ def pwm_driver(pin_ids, pattern_fcn, freq_pwm=10_000, **kwargs):
         yield delay_ms
 
 
-def neo_driver_bitstream(pin, pattern_fcn, n, bpp=3, timing=1, **kwargs):
+def neo_driver_bitstream(pin, pattern, n, bpp=3, timing=1, **kwargs):
     # Timing arg can either be 1 for 800kHz or 0 for 400kHz,
     # or a user-specified timing ns tuple (high_0, low_0, high_1, low_1).
 
@@ -48,7 +48,7 @@ def neo_driver_bitstream(pin, pattern_fcn, n, bpp=3, timing=1, **kwargs):
     timing = ((400, 850, 800, 450) if timing else (800, 1700, 1600, 900)) if isinstance(timing, int) else timing
     pixel_buffer = PixelBufferNeo(n, bpp)
     task_id = -1
-    for delay_ms in pattern_fcn(pixel_buffer=pixel_buffer, **kwargs):
+    for delay_ms in pattern(pixel_buffer=pixel_buffer, **kwargs):
         # update
 
         # sent pixels to leds
@@ -58,7 +58,7 @@ def neo_driver_bitstream(pin, pattern_fcn, n, bpp=3, timing=1, **kwargs):
         yield delay_ms
 
 
-def neo_driver_pio(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
+def neo_driver_pio(pin, pattern, n, bpp=3, state_machine=0, **kwargs):
     if bpp == 3:
         pio_driver = __WS282B__
     elif bpp == 4:
@@ -79,7 +79,7 @@ def neo_driver_pio(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
 
     sm_put = lambda x: sm.put(x, cut)
 
-    for delay_ms in pattern_fcn(pixel_buffer=pixel_buffer, **kwargs):
+    for delay_ms in pattern(pixel_buffer=pixel_buffer, **kwargs):
 
         # sent pixels to leds
         buf = pixel_buffer.buf
@@ -89,7 +89,7 @@ def neo_driver_pio(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
         yield delay_ms
 
 
-def neo_driver_dma(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
+def neo_driver_dma(pin, pattern, n, bpp=3, state_machine=0, **kwargs):
     if bpp == 3:
         pio_driver = __WS282B__
     elif bpp == 4:
@@ -107,7 +107,7 @@ def neo_driver_dma(pin, pattern_fcn, n, bpp=3, state_machine=0, **kwargs):
 
     pixel_buffer = PixelBufferNeo(n, bpp, dma=True)
     yield 0
-    for delay_ms in pattern_fcn(pixel_buffer=pixel_buffer, **kwargs):
+    for delay_ms in pattern(pixel_buffer=pixel_buffer, **kwargs):
         # sent pixels to leds        
 
         ch.mem_2_pio(pixel_buffer.buf, state_machine, dma.DMA_SIZE_32)

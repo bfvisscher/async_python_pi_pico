@@ -79,7 +79,7 @@ def HassNumber(mqtt: HomeAssistantMQTT, name, command_callback, initial_value=0,
 
 
 def HassLight(mqtt: HomeAssistantMQTT, name, command_callback, color_mode=None, effect_list=[],
-              initial_state={"_rotary_state": "OFF"}, icon="mdi:lightbulb-variant-outline", **kwargs) -> HomeAssistantEntity:
+              initial_state={"state": "OFF"}, icon="mdi:lightbulb-variant-outline", **kwargs) -> HomeAssistantEntity:
     """
     Create an entity representing a light
 
