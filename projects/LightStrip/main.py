@@ -1,10 +1,10 @@
+import json
+
 import async_hass
 from async_pb_drivers import *
 from async_runner import *
 from async_tasks import *
 from patterns import *
-import json
-
 
 pin_strip_upper = 27
 pin_strip_lower = 6
@@ -14,7 +14,8 @@ blackboard = {}  # used to create a shared variable space
 with open('secrets.json', 'rt') as f:
     secrets = json.load(f)
 
-hass_mqtt = async_hass.HomeAssistantMQTT('192.168.68.11:1883', secrets['mqtt.username'], secrets['mqtt.password'], secrets['wifi.ssid'], secrets['wifi.password'])
+hass_mqtt = async_hass.HomeAssistantMQTT('192.168.68.11:1883', secrets['mqtt.username'], secrets['mqtt.password'],
+                                         secrets['wifi.ssid'], secrets['wifi.password'])
 
 add_task(cpu_load, mqtt=hass_mqtt, time_between_report_ms=5000)
 add_task(heartbeat)
@@ -65,7 +66,6 @@ pattern_attention_multisegment_bpp3 = (multi_pattern, {'segment_sizes': [14, 116
 pattern_snakes_bpp3 = (snakes, {'pixel_list': pl3, 'max_speed': 3, 'fade': 0.7})
 pattern_piano_bpp3 = (piano, {'pixel': [255, 255, 255]})
 
-
 pattern_blink_bpp4 = (blink, {'pixel': [0, 255, 255, 0]})
 pattern_breathing_bpp4 = (breathing, {'pixel_list': pl4})
 pattern_piano_bpp4 = (piano, {'pixel': [0, 0, 0, 255]})
@@ -87,7 +87,7 @@ strip2_patterns = {
     'updown': pattern_updown_bpp4,
     'party': pattern_snakes_bpp4,
     'piano': pattern_piano_bpp4,
-    'breathing': pattern_breathing_bpp4,    
+    'breathing': pattern_breathing_bpp4,
 }
 
 # selection of the pattern
@@ -119,4 +119,3 @@ add_task(ledstrip_driver, pin_strip_lower, hass_lightstrip, name='Lightstrip Sta
 # add_task(ledstrip_driver , pin_strip_lower, left_right_slow, lr_pixel=[255, 255, 0, 0], rl_pixel=[0, 255, 255, 0], n=300, bpp=4, state_machine=1, freq=60)
 
 start_tasks()  # keeps running forever
-
