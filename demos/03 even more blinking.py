@@ -6,7 +6,9 @@ from gbl import ON_BOARD_LED_PIN
 
 # seeing some code duplication so lets simplify
 
-# hardware setup : add an LED on pin 16 and 17
+# HARDWARE SETUP:
+#   2 x red LED + 2x 220ohm resistor
+#   add the LED on pin 27 and 28
 
 
 # Define the tasks ***********************************************************
@@ -25,8 +27,8 @@ def blinking_led(pin_id):
 
 # Add the tasks ****************************************************************
 add_task(blinking_led, pin_id=ON_BOARD_LED_PIN)
-add_task(blinking_led, pin_id=16)
-add_task(blinking_led, pin_id=17)
+add_task(blinking_led, pin_id=27)
+add_task(blinking_led, pin_id=28)
 
 # start all the tasks **********************************************************
 start_tasks()

@@ -27,8 +27,8 @@ class KY040(Button):  # Rotary input
         possible events in the callback are:
             KY040.COUNTER_CLOCKWISE
             KY040.CLOCKWISE
-            Button.PRESS
-            Button.RELEASE
+            KY040.PRESS
+            KY040.RELEASE
             
         NOTE: Because of the time between event determination and callback execution,
               it is possible to have both KY040.COUNTER_CLOCKWISE and KY040.CLOCKWISE
@@ -49,10 +49,10 @@ class KY040(Button):  # Rotary input
         if self._rotary_state in [0, 3]:
             self._rotary_state = new_state
         elif new_state == 0:  # self._rotary_state in [1,2]
-            rotary_event = KY040.CLOCKWISE if self._rotary_state == 1 else KY040.COUNTER_CLOCKWISE
+            rotary_event = KY040.CLOCKWISE if self._rotary_state == 2 else KY040.COUNTER_CLOCKWISE
             self._rotary_state = new_state
         elif new_state == 3:  # self._rotary_state in [1,2]
-            rotary_event = KY040.COUNTER_CLOCKWISE if self._rotary_state == 1 else KY040.CLOCKWISE
+            rotary_event = KY040.COUNTER_CLOCKWISE if self._rotary_state == 2 else KY040.CLOCKWISE
             self._rotary_state = new_state
 
         if rotary_event:

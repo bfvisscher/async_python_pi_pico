@@ -5,6 +5,7 @@
 
 import time
 
+import rp2
 import uasyncio
 from machine import Pin, PWM
 
@@ -17,27 +18,33 @@ def as_pins(pin_ids, *nargs, **kwargs):
     return pins
 
 
-def as_pwm(pin_ids, freq_pwm):
+def as_pwm(pin_ids, freq):
     pwm_pins = []
     for pin in pin_ids:
         pin = PWM(Pin(pin, Pin.OUT))
-        pin.freq(freq_pwm)
+        pin.freq(freq)
         pwm_pins.append(pin)
     return pwm_pins
 
 
-async def _run(fcn, *nargs, **kwargs) -> None:
-    last_wait_time = time.ticks_ms()
-    for item in fcn(*nargs, **kwargs):
-        if isinstance(item, int):
-            last_wait_time = time.ticks_add(last_wait_time, item)
-            wait_for_ms = time.ticks_diff(last_wait_time, time.ticks_ms())
-            if wait_for_ms < 0:
-                wait_for_ms = 0
-            await uasyncio.sleep_ms(wait_for_ms)
+async def _run(fcn, *nargs, exception_handler, **kwargs) -> None:
+    try:
+        last_wait_time = time.ticks_ms()
+        for item in fcn(*nargs, **kwargs):
+            if isinstance(item, int):
+                last_wait_time = time.ticks_add(last_wait_time, item)
+                wait_for_ms = time.ticks_diff(last_wait_time, time.ticks_ms())
+                if wait_for_ms < 0:
+                    wait_for_ms = 0
+                await uasyncio.sleep_ms(wait_for_ms)
+            else:
+                await item
+                last_wait_time = time.ticks_ms()
+    except Exception as e:
+        if exception_handler:
+            exception_handler(e)
         else:
-            await item
-            last_wait_time = time.ticks_ms()
+            raise
 
 
 def wait_for(fcn, *nargs, **kwargs):
@@ -45,10 +52,25 @@ def wait_for(fcn, *nargs, **kwargs):
         return await fcn(*nargs, **kwargs)
 
 
-def add_task(fcn, *nargs, **kwargs):
-    return uasyncio.create_task(_run(fcn, *nargs, **kwargs))
+def add_task(fcn, *nargs, exception_handler=None, **kwargs):
+    return uasyncio.create_task(_run(fcn, *nargs, exception_handler=exception_handler, **kwargs))
 
 
 def start_tasks():
     print('Starting tasks')
-    uasyncio.get_event_loop().run_forever()
+
+    # not available in rp2 port
+    # sys.atexit(cleanup)
+
+    try:
+        uasyncio.get_event_loop().run_forever()
+    finally:
+        cleanup()
+
+
+def cleanup():
+    print('Removing all PIO programs')
+
+    # https://github.com/micropython/micropython/issues/9003
+    for i in range(2):
+        rp2.PIO(i).remove_program()

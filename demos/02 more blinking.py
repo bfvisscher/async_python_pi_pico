@@ -6,7 +6,11 @@ from gbl import ON_BOARD_LED_PIN
 
 # now that we added a single task, lets add on more to see how easy it is.
 
-# hardware setup : add an LED on pin 16
+# HARDWARE SETUP:
+#   (using same setup as https://www.electroniclinic.com/raspberry-pi-pico-onboard-led-blinking-example/)
+#   1 red LED + 220ohm resistor
+#   add the LED on pin 28
+
 
 # Define the tasks ***********************************************************
 
@@ -21,7 +25,7 @@ def blinking_on_board():
 
 
 def blinking_led():
-    pin = Pin(16, Pin.OUT)
+    pin = Pin(28, Pin.OUT)
     while True:
         pin.on()
         yield 200

@@ -3,6 +3,12 @@
 # https://opensource.org/licenses/MIT
 
 
+#  This file shows a demo of some of the home assistant entities that can be created
+#  Information (including configuration information) is automatically sent to the MQTT
+#  server (which HomeAssistant can subsequently discover). Call backs from home assistants
+#  and state updates is also demonstrated for different types of entities.
+
+
 import json
 
 import async_hass
@@ -20,7 +26,7 @@ hass_mqtt = async_hass.HomeAssistantMQTT('192.168.68.11:1883', secrets['mqtt.use
 
 def test_callback(entity, state):
     print(entity.name, state)
-    return state
+    return state  # return values from a callback are assumed to be the new state and are automatically send to MQTT
 
 
 button_1 = HassButton(hass_mqtt, 'button1', test_callback)
@@ -38,12 +44,14 @@ light1 = HassLight(hass_mqtt, 'Light_1', test_callback, color_mode='rgb')
 light2 = HassLight(hass_mqtt, 'Light_2', test_callback, color_mode='rgbw')
 
 
+# example of how to create a HomeAssistant sensor that is updated regularly
 def test(name, poll_ms=1000):
-    entity = HassSensor(hass_mqtt, name, 0)
+    entity = HassSensor(hass_mqtt, name,  0)
     while True:
         entity.state = (entity.state + 1) % 20
         entity.publish_state()
         yield poll_ms
+
 
 
 add_task(heartbeat)

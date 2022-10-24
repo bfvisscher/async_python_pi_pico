@@ -7,8 +7,9 @@ from gbl import ON_BOARD_LED_PIN
 
 # seeing some code duplication so lets simplify
 
-# hardware setup : add an LED on pin 16 and 17
-
+# HARDWARE SETUP:
+#   2 x red LED + 2x 220ohm resistor
+#   add the LED on pin 27 and 28
 
 # Define the tasks ***********************************************************
 
@@ -30,8 +31,8 @@ def blinking_led(pin_id, on_time_ms=200, off_time_ms=800):
 # events the blinking to twice per second
 add_task(blinking_led, pin_id=ON_BOARD_LED_PIN, on_time_ms=100, off_time_ms=400)
 
-add_task(blinking_led, pin_id=16)  # use default parameters
-add_task(blinking_led, pin_id=17, on_time_ms=400, off_time_ms=1600)  # twice as slow
+add_task(blinking_led, pin_id=27)  # use default parameters
+add_task(blinking_led, pin_id=28, on_time_ms=400, off_time_ms=1600)  # twice as slow
 
 add_task(cpu_load)  # task that shows how much memory and cpu load is being used
 

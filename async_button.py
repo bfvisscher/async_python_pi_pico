@@ -17,10 +17,10 @@ class Button:
     RELEASE = 2
     PRESS = 1
 
-    def __init__(self, button_pin, callback, consecutive=4, interval_ms=5):
+    def __init__(self, pin, callback, consecutive=4, interval_ms=5):
         """
 
-        :param button_pin: pin with button connected (assumed 0 is pressed, 1 is released)
+        :param pin: pin with button connected (assumed 0 is pressed, 1 is released)
         :param callback:  method f(events:int)
         :param consecutive: nr of consecutive identical pin states before changing (used for debouncing)
         :param interval_ms: time between each consecutive pin state (used for debouncing)
@@ -29,7 +29,7 @@ class Button:
             Button.PRESS
             Button.RELEASE
         """
-        self.button_pin = Pin(button_pin, Pin.IN, Pin.PULL_UP)
+        self.button_pin = Pin(pin, Pin.IN, Pin.PULL_UP)
         self.button_pin.irq(self._button_irq_handler, Pin.IRQ_RISING | Pin.IRQ_FALLING)
         self.irq_event = uasyncio.ThreadSafeFlag()
         self.callback = callback
