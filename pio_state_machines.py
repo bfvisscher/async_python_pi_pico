@@ -24,7 +24,7 @@ def __WS282B__():
     nop().side(0)[T2 - 1]
     wrap()
 
-# PIO _rotary_state machine for RGBW. Pulls 32 bits (rgbw -> 4 * 8bit) automatically
+# PIO _rotary_state machine for RGBW. Pulls 32 bits (rgbw -> 4 * 8bit) 
 @rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=32)
 def __SK6812__():
     """

@@ -136,17 +136,16 @@ def mobile_platform(hass_mqtt, stall_zone=.3, freq=1000):
     echo_feedback = HCSR04(signal_pin=27, callback=ranging_cb, measure=SignalTimer.TIME_HIGH, hard=True)
     servo = AngularServo(10)
     step = 45
-    delay_ms = 125
+    delay_ms = 200
     yield 1000
     while True:
-        for st in [(0, 90, step), (90, -90, -step), (-90, 0, step)]:
-            for angle in range(*st):
-                servo.angle = angle
-                yield delay_ms - 10  # time for servo to reach new position
-                trigger_pin.value(1)  # do some ranging
-                yield 10
-                trigger_pin.value(0)
-                yield delay_ms  # time to receive echo signal
+        for angle in [0, 45, 90, 45, 0, -45, -90, -45]:
+            servo.angle = angle
+            yield delay_ms - 10  # time for servo to reach new position
+            trigger_pin.value(1)  # do some ranging
+            yield 10
+            trigger_pin.value(0)
+            yield delay_ms - 10  # time to receive echo signal
 
 
 add_task(mobile_platform, hass_mqtt)

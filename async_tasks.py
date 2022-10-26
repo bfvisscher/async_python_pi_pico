@@ -3,12 +3,11 @@
 # https://opensource.org/licenses/MIT
 
 
-import gc
 import random
 import time
-
+import gc
 import uasyncio
-from machine import Pin, WDT
+from machine import Pin, WDT, ADC
 
 from async_runner import as_pwm
 from gbl import ON_BOARD_LED_PIN
@@ -51,14 +50,14 @@ def random_item_selector(black_board, entry, items, switch_time_ms, repetition=F
 
 
 def cpu_load(time_between_report_ms=1000, mqtt=None):
-    # idle_load = 417.7  # 417.0 # compensate for regular overhead of async
+    sensor_temp_adc = ADC(4)
+
     if mqtt is not None:
         from hass_entities import HassSensor
         cpu_sensor = HassSensor(mqtt, "CPU utilization", 0, unit_of_measurement="%", icon="mdi:cpu-64-bit")
-
+        temp_sensor = HassSensor(mqtt, "Temperature", 0, unit_of_measurement="'C", icon="mdi:thermometer")
     idle_load = None
-    gc.disable()
-    load = 80
+    load = 0
     while True:
         start_time = time.ticks_ms()
 
@@ -86,18 +85,19 @@ def cpu_load(time_between_report_ms=1000, mqtt=None):
                 idle_load = out_time
 
             total_out_time = time.ticks_add(out_time, total_out_time)
-            if load < 70:
-                gc.collect()
 
-        # print("loopsit id  : %i   idle: %i    self : %i    Out : %i" % (
-        # loop, self.idle_load, total_self_time, total_out_time))
-        load = 100 - 100 * (total_self_time + (loop * idle_load)) / (total_out_time + total_self_time)
+        load = (100 - 100 * (total_self_time + (loop * idle_load)) / (
+                total_out_time + total_self_time)) * .5 + .5 * load
 
+        reading = 3.3 * sensor_temp_adc.read_u16() / 65535
+        temperature = 27 - (reading - 0.706) / 0.001721
         if mqtt is not None:
-            cpu_sensor.state = round(load, 0)
+            cpu_sensor.state = round(load, 1)
             cpu_sensor.publish_state()
-        else:
-            print('CPU load: %2.1f%%  RAM free %d RAM alloc %d' % (load, gc.mem_free(), gc.mem_alloc()))
+            temp_sensor.state = round(temperature, 1)
+            temp_sensor.publish_state()
+        print('CPU load:%2.1f%%     Temp:%2.1f°C     RAM free:%7d     RAM alloc:%7d' % (
+            load, temperature, gc.mem_free(), gc.mem_alloc()))
 
 
 def heartbeat(pin=ON_BOARD_LED_PIN):

@@ -4,7 +4,7 @@
 
 
 import time
-
+import gc
 import rp2
 import uasyncio
 from machine import Pin, PWM
@@ -31,6 +31,7 @@ async def _run(fcn, *nargs, exception_handler, **kwargs) -> None:
     try:
         last_wait_time = time.ticks_ms()
         for item in fcn(*nargs, **kwargs):
+            gc.collect()  # for gc to keep things smooth
             if isinstance(item, int):
                 last_wait_time = time.ticks_add(last_wait_time, item)
                 wait_for_ms = time.ticks_diff(last_wait_time, time.ticks_ms())
@@ -61,7 +62,8 @@ def start_tasks():
 
     # not available in rp2 port
     # sys.atexit(cleanup)
-
+    gc.collect()
+    gc.disable()
     try:
         uasyncio.get_event_loop().run_forever()
     finally:

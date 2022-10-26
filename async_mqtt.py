@@ -28,8 +28,8 @@ from sys import platform
 VERSION = (0, 6, 6)
 
 # Default short delay for good SynCom throughput (avoid sleep(0) with SynCom).
-_DEFAULT_MS = const(20)
-_SOCKET_POLL_DELAY = const(5)  # 100ms added greatly to publish latency
+_DEFAULT_MS = const(0)
+_SOCKET_POLL_DELAY = const(0)  # 100ms added greatly to publish latency
 
 # Legitimate errors while waiting on a socket. See uasyncio __init__.py open_connection().
 ESP32 = platform == 'esp32' or platform == 'esp32_LoBo'
