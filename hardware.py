@@ -368,7 +368,7 @@ class _DMA:
     def __init__(self, channels=10):
         print('Initialising DMA')
         self._internals = struct(DMA_BASE, DMA_REGS)
-        self._channels = [DMAChannel(i, self) for i in range(channels-1, 0, -1)]
+        self._channels = [DMAChannel(i, self) for i in range(channels)]
         self.abort()
 
     @micropython.native
