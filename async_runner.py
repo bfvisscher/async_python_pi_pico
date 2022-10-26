@@ -67,7 +67,11 @@ def start_tasks():
     try:
         uasyncio.get_event_loop().run_forever()
     finally:
+        gc.collect()
+        gc.enable()
         cleanup()
+
+
 
 
 def cleanup():
