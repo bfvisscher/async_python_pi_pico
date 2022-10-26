@@ -398,7 +398,7 @@ class _DMA:
 
     @micropython.native
     def unused_channel(self) -> DMAChannel:
-        for ch in self._channels:
+        for ch in reversed(self._channels): # lower dma channels are used so are less reliable
             if not ch.is_busy() and not ch.allocated:
                 return ch
         return None
