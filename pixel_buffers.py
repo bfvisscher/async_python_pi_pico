@@ -13,34 +13,31 @@ FULL_SLICE = make_slice[:]
 
 
 class PixelBuffer:
-    def __init__(self, n, type='B'):
+    def __init__(self, n, max_pixel_value, type='B'):
         """
         :param n: number of pixels in the buffer
         """
         self.n = n
         self.buf = array.array(type, [0 for _ in range(n)])
-        if type == 'B':
-            max_value = 0xff
-        elif type == 'H':
-            max_value = 0xffff
-        else:
-            max_value = 0xffffffff
-        self.max_value = max_value
+        self.max_pixel_value = max_pixel_value
+
+    @micropython.native
+    def fade_pixel_value(self, value, fade):
+        """
+        Fades a pixel value
+        :param value: original pixel value
+        :param fade: value between 0 and 1
+        :return: new faded pixel value
+        """
+        return min(self.max_pixel_value, int(value * fade))
+
+    @micropython.native
+    def merge_pixel_value(self, value1, value2):
+        return min(self.max_pixel_value, value1 + value2)
 
     @micropython.native
     def __len__(self):
         return self.n
-
-    @micropython.native
-    def rotate_left(self, num_of_pixels: int = 1):
-        mem = memoryview(self.buf)
-        self.buf = mem[num_of_pixels:] + mem[:num_of_pixels]
-
-    @micropython.native
-    def rotate_right(self, num_of_pixels: int = 1):
-        num_of_pixels = -num_of_pixels
-        mem = memoryview(self.buf)
-        self.buf = mem[num_of_pixels:] + mem[:num_of_pixels]
 
     @micropython.native
     def __setitem__(self, idx, v):
@@ -83,78 +80,43 @@ class PixelBuffer:
     @micropython.native
     def pixel_merge(self, i, p):
         buf = self.buf
-        buf[i] = min(self.max_value, p + buf[i])
+        buf[i] = min(self.max_pixel_value, p + buf[i])
+
+
+class PixelBufferBit(PixelBuffer):
+    def __init__(self, n):
+        super().__init__(n, 1, 'b')
 
 
 class PixelBufferPWM(PixelBuffer):
     def __init__(self, n):
-        super().__init__(n, 'H')
+        super().__init__(n, 65535, 'H')
 
 
 class PixelBufferNeo(PixelBuffer):
 
-    @micropython.viper
-    def in_convert_grb(self, value):
-        tmp = ptr8(self.tmp_buf)
-        # tmp[0] = 0  # ignored
-        tmp[1] = uint(value[1])
-        tmp[2] = uint(value[0])
-        tmp[3] = uint(value[2])
+    def __init__(self, n, bpp):
+        if bpp == 3:  # G R B
+            max_value = [255, 255, 255]
+        elif bpp == 4:  # G R B W
+            max_value = [0, 0, 0, 255]
+
+        super().__init__(n, max_value, 'I')
+        self.tmp_buf = array.array('B', [0, 0, 0, 0])
+        self.bpp = bpp
 
     @micropython.viper
-    def out_convert_grb(self, index: int):
-        tmp = ptr8(self.tmp_buf)
-        buf = ptr8(self.buf)
-        index <<= 2
-        tmp[0] = buf[index + 2]
-        tmp[1] = buf[index + 1]
-        tmp[2] = buf[index + 3]
-
-    @micropython.viper
-    def in_convert_grb_dma(self, value):
-        tmp = ptr8(self.tmp_buf)
-        # tmp[0] = 0  # ignored
-        tmp[1] = uint(value[2])  # blue
-        tmp[2] = uint(value[0])
-        tmp[3] = uint(value[1])
-
-    @micropython.viper
-    def out_convert_grb_dma(self, index: int):
-        tmp = ptr8(self.tmp_buf)
-        buf = ptr8(self.buf)
-        index <<= 2
-        tmp[0] = buf[index + 2]
-        tmp[1] = buf[index + 3]
-        tmp[2] = buf[index + 1]
-
-    @micropython.viper
-    def in_convert_grbw(self, value):
-        tmp = ptr8(self.tmp_buf)
-        tmp[0] = uint(value[1])
-        tmp[1] = uint(value[0])
-        tmp[2] = uint(value[2])  # blue
-        tmp[3] = uint(value[3])
-
-    @micropython.viper
-    def out_convert_grbw(self, index: int):
-        tmp = ptr8(self.tmp_buf)
-        buf = ptr8(self.buf)
-        index <<= 2
-        tmp[0] = buf[index + 1]
-        tmp[1] = buf[index + 0]
-        tmp[2] = buf[index + 2]
-        tmp[3] = buf[index + 3]
-
-    @micropython.viper
-    def in_convert_grbw_dma(self, value):
+    def in_convert(self, value):
+        bpp = int(self.bpp)
         tmp = ptr8(self.tmp_buf)
         tmp[3] = uint(value[1])
         tmp[2] = uint(value[0])
         tmp[1] = uint(value[2])
-        tmp[0] = uint(value[3])
+        if bpp == 4:
+            tmp[0] = uint(value[3])
 
     @micropython.viper
-    def out_convert_grbw_dma(self, index: int):
+    def out_convert(self, index: int):
         tmp = ptr8(self.tmp_buf)
         buf = ptr8(self.buf)
         index <<= 2
@@ -163,25 +125,19 @@ class PixelBufferNeo(PixelBuffer):
         tmp[2] = buf[index + 1]
         tmp[3] = buf[index + 0]
 
-    def __init__(self, n, bpp, dma=False):
-        super().__init__(n, 'I')
-        self.tmp_buf = array.array('B', [0, 0, 0, 0])
-        self.bpp = bpp
-        self.n = n
-        if not dma:
-            if bpp == 3:  # G R B
-                self.in_convert = self.in_convert_grb
-                self.out_convert = self.out_convert_grb
-            elif bpp == 4:  # G R B W
-                self.in_convert = self.in_convert_grbw
-                self.out_convert = self.out_convert_grbw
-        else:
-            if bpp == 3:  # G R B
-                self.in_convert = self.in_convert_grb_dma
-                self.out_convert = self.out_convert_grb_dma
-            elif bpp == 4:  # G R B W
-                self.in_convert = self.in_convert_grbw_dma
-                self.out_convert = self.out_convert_grbw_dma
+    @micropython.native
+    def fade_pixel_value(self, value, fade):
+        """
+        Fades a pixel value
+        :param value: original pixel value (list)
+        :param fade: value between 0 and 1
+        :return: new faded pixel value
+        """
+        return [min(255, int(v * fade)) for v in value]
+
+    @micropython.native
+    def merge_pixel_value(self, value1, value2):
+        return [min(255, v1 + v2) for v1, v2 in zip(value1, value2)]
 
     def __len__(self):
         return self.n
@@ -210,7 +166,7 @@ class PixelBufferNeo(PixelBuffer):
 
     @micropython.native
     def fill(self, v, slc: slice = FULL_SLICE):
-        return self._fill(v, slc)
+        self._fill(v, slc)
 
     @micropython.viper
     def _fill(self, v, slc):
@@ -265,6 +221,15 @@ class PixelBufferSegment(PixelBuffer):
         self.start = max(0, min(start, self.buf.n))
         self.end = max(0, min(end, self.buf.n))
         self.n = 1 + self.end - self.start
+        self.max_value = pixel_buffer.max_pixel_value
+
+    @micropython.native
+    def fade_pixel_value(self, value, fade):
+        return self.buf.fade_pixel_value(value, fade)
+
+    @micropython.native
+    def merge_pixel_value(self, value1, value2):
+        return self.buf.merge_pixel_value(value1, value2)
 
     @micropython.native
     def _reslice(self, slc):

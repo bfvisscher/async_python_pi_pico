@@ -34,7 +34,7 @@ hass_device = {
 
 
 class HomeAssistantEntity:
-    def __init__(self, name, entity_type, ha: "HomeAssistantMQTT", config, initial_state=None, cmd_callback=None,
+    def __init__(self, name, entity_type, ha: "HomeAssistantMQTT", config, initial_state=None, callback=None,
                  device=hass_device, qos=1):
         if isinstance(config, (dict, list)):
             config = config.copy()
@@ -45,13 +45,13 @@ class HomeAssistantEntity:
         self.entity_type = entity_type
 
         self._ha = ha
-        self.cmd_callback = cmd_callback
+        self.callback = callback
         self.state = initial_state
 
         self.qos = qos
         config['name'] = name
         if device is not None:
-            config['device'] = device
+            config['device'] = device.copy()
 
         if "unique_id" not in config:
             config['unique_id'] = self.name.lower().replace(' ', '_') + '_' + binascii.hexlify(
@@ -62,20 +62,21 @@ class HomeAssistantEntity:
         if '~' not in config:
             config['~'] = self.entity_topic
 
+        self.state_topic = None
         if initial_state is not None:
             self.state = initial_state
-        if 'stat_t' in config:
-            state_topic = config['stat_t']
-        elif 'state_topic' in config:
-            state_topic = config['state_topic']
-        else:
-            config['stat_t'] = '~/state'
-            state_topic = '~/state'
-        self.state_topic = state_topic.replace('~', config['~'])
+            if 'stat_t' in config:
+                state_topic = config['stat_t']
+            elif 'state_topic' in config:
+                state_topic = config['state_topic']
+            else:
+                config['stat_t'] = '~/state'
+                state_topic = '~/state'
+            self.state_topic = state_topic.replace('~', config['~'])
+            self.publish_state()
 
-        self.publish_state()
-
-        if cmd_callback is not None:
+        self.command_topic = None
+        if self.callback is not None:
             if 'cmd_t' in config:
                 command_topic = config['cmd_t']
             elif 'command_topic' in config:
@@ -107,10 +108,9 @@ class HomeAssistantEntity:
         except:
             message = message.decode('utf-8')  # convert to string
 
-        new_state = self.cmd_callback(self, message)
+        new_state = self.callback(self, message)
 
-        if new_state and self.entity_type not in ['button']:  # exclude non-state entity types
-            self.state = new_state
+        if new_state and self.state_topic:
             self.publish_state()
 
 
@@ -159,6 +159,7 @@ class HomeAssistantMQTT:
         self.anything_todo.set()
 
     async def update(self):
+
         await self.connect(**self._mqtt_connect)
         while True:
             await self.anything_todo.wait()
@@ -170,6 +171,5 @@ class HomeAssistantMQTT:
                 elif len(self.publish_queue) > 0:
                     msg = self.publish_queue.pop(0)
                     await self._mqtt_client.publish(*msg)
-                await uasyncio.sleep_ms(5)  # small pause to let messages be processed
 
             self.anything_todo.clear()

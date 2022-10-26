@@ -50,7 +50,7 @@ DMA_SIZE_16 = const(1)
 DMA_SIZE_32 = const(3)
 
 # DMA: RP2040 datasheet 2.5.7
-DMA_CTRL_TRIG_FIELDS = {
+DMA_CTRL_FIELDS = {
     "AHB_ERROR": 31 << BF_POS | 1 << BF_LEN | BFUINT32,
     "READ_ERROR": 30 << BF_POS | 1 << BF_LEN | BFUINT32,
     "WRITE_ERROR": 29 << BF_POS | 1 << BF_LEN | BFUINT32,
@@ -69,21 +69,31 @@ DMA_CTRL_TRIG_FIELDS = {
     "EN": 0 << BF_POS | 1 << BF_LEN | BFUINT32
 }
 
-# Channel-specific DMA registers
+# Channel-specific DMA registers, have one trigger and one non trigger version of each [2.5.2.1]
 DMA_CHAN_REGS = {
     "READ_ADDR_REG": 0x00 | UINT32,
+    "READ_ADDR_REG_TRIG": 0x3C | UINT32,
+
     "WRITE_ADDR_REG": 0x04 | UINT32,
+    "WRITE_ADDR_REG_TRIG": 0x2C | UINT32,
+
     "TRANS_COUNT_REG": 0x08 | UINT32,
-    "CTRL_TRIG_REG": 0x0c | UINT32,
-    "CTRL_TRIG": (0x0c, DMA_CTRL_TRIG_FIELDS),
+    "TRANS_COUNT_REG_TRIG": 0x1C | UINT32,
+
+    "CTRL_REG_TRIG": 0x0C | UINT32,
+    "CTRL_TRIG": (0x0C, DMA_CTRL_FIELDS),
+
+    "CTRL_REG": 0x10 | UINT32,
+    "CTRL": (0x10, DMA_CTRL_FIELDS),
 }
+
 # General DMA registers
 DMA_REGS = {
     "INTR": 0x400 | UINT32,
-    "INTE0": 0x404 | UINT32,
+    "INTE0": 0x404 | UINT32,  # enable/disable irq0 for channel
     "INTF0": 0x408 | UINT32,
     "INTS0": 0x40c | UINT32,
-    "INTE1": 0x414 | UINT32,
+    "INTE1": 0x414 | UINT32,  # enable/disable irq1 for channel
     "INTF1": 0x418 | UINT32,
     "INTS1": 0x41c | UINT32,
     "TIMER0": 0x420 | UINT32,
@@ -239,33 +249,75 @@ class DMAChannel:
         self._internals = struct(DMA_BASE + channel_id * DMA_CHAN_WIDTH, DMA_CHAN_REGS)
         self.reset()
 
-    @micropython.native
+    def status(self):
+        print("Control :  0b{0:032b}".format(self._internals.CTRL_REG))
+        print("Read    :  0x{0:08x}".format(self._internals.READ_ADDR_REG))
+        print("Write   :  0x{0:08x}".format(self._internals.WRITE_ADDR_REG))
+        print("Transfer:  0x{0:08x}".format(self._internals.TRANS_COUNT_REG))
+        # print("Read    :  {}".format(self._internals.READ_ADDR_REG))
+        # print("Write   :  {}".format(self._internals.WRITE_ADDR_REG))
+        # print("Transfer:  {}".format(self._internals.TRANS_COUNT_REG))
+
     def reset(self):
-        cn = int(self.id)
-        self._internals.CTRL_TRIG_REG = cn << 11
+        # set defaults
+        self.chain_to = None
+        self._internals.CTRL.IRQ_QUIET = 1
+        self._internals.CTRL.EN = 1  # enable channel
+        self._internals.CTRL.HIGH_PRIORITY = 1
+        self._internals.CTRL.BSWAP = 0
+        self._internals.CTRL.SNIFF_EN = 0
+        self._internals.CTRL.RING_SEL = 0
+        self._internals.CTRL.RING_SIZE = 0
+
+    def byteswap(self, enabled=None):
+        if enabled is not None:
+            self._internals.CTRL.BSWAP = enabled
+        return self._internals.CTRL.BSWAP
+
+    def enable(self):
+        self._internals.CTRL.EN = 1  # enable channel
+
+    def is_enabled(self):
+        return self._internals.CTRL.EN
+
+    def disable(self):
+        self._internals.CTRL.EN = 0  # enable channel
+
+    @property
+    def chain_to(self):
+        value = self._internals.CTRL.CHAIN_TO
+        return value if value != self.id else None
+
+    @chain_to.setter
+    def chain_to(self, value=None):
+        if value is None:
+            value = self.id
+        self._internals.CTRL.CHAIN_TO = int(value)
+
+    def trans_count_trigger(self, count):
+        self._internals.TRANS_COUNT_REG = count
+
+    def trigger(self):
+        self._internals.CTRL_TRIG.EN = 1  # enable channel and trigger
 
     @micropython.native
     def is_busy(self):
-        return self._internals.CTRL_TRIG.BUSY
+        return self._internals.CTRL.BUSY
 
     @micropython.native
-    def mem_2_mem(self, source, target, data_size: int):
-        self.reset()
+    def mem_2_mem(self, source, target, data_size: int = DMA_SIZE_32, BSWAP=0):
+        self._internals.CTRL.BSWAP = BSWAP
+        self._internals.CTRL.DATA_SIZE = data_size
+        self._internals.CTRL.INCR_WRITE = 1
+        self._internals.CTRL.INCR_READ = 1
+        self._internals.CTRL.TREQ_SEL = TREQ_UNPACED  # start copying
         self._internals.READ_ADDR_REG = addressof(source)
         self._internals.WRITE_ADDR_REG = addressof(target)
         self._internals.TRANS_COUNT_REG = len(source)
-        # self._internals.CTRL_TRIG.DATA_SIZE = DMA_SIZE_32  # size 4
-        # self._internals.CTRL_TRIG.INCR_WRITE = 1
-        # self._internals.CTRL_TRIG.INCR_READ = 1
-        # self._internals.CTRL_TRIG.HIGH_PRIORITY = 1        
-        # self._internals.CTRL_TRIG.IRQ_QUIET = 1
-        # self._internals.CTRL_TRIG.TREQ_SEL = TREQ_UNPACED  # start copying
-        # self._internals.CTRL_TRIG.EN = 1  # start copying
-        self._internals.CTRL_TRIG_REG = (0x3f8033 | data_size << 2)
+        self.trigger()
 
     @micropython.native
-    def mem_2_pio(self, source, pio_state_machine, data_size: int = DMA_SIZE_32):
-        self.reset()
+    def mem_2_pio(self, source, pio_state_machine, data_size: int = DMA_SIZE_32, BSWAP=0):
         if pio_state_machine < 4:
             target = PIO0_BASE
             dreq = pio_state_machine
@@ -274,21 +326,23 @@ class DMAChannel:
             pio_state_machine -= 4
             dreq = pio_state_machine + 8
         target += 0x10 + (pio_state_machine << 2)
+
+        self._internals.CTRL.BSWAP = BSWAP
+        self._internals.CTRL.DATA_SIZE = data_size
+        self._internals.CTRL.INCR_WRITE = 0
+        self._internals.CTRL.INCR_READ = 1
+        self._internals.CTRL.TREQ_SEL = dreq  # transfer at pace of pio
         self._internals.READ_ADDR_REG = addressof(source)
         self._internals.WRITE_ADDR_REG = target
         self._internals.TRANS_COUNT_REG = len(source)
-        # self._internals.CTRL_TRIG.BSWAP = 1
-        self._internals.CTRL_TRIG.DATA_SIZE = data_size
-        self._internals.CTRL_TRIG.INCR_WRITE = 0
-        self._internals.CTRL_TRIG.INCR_READ = 1
-        self._internals.CTRL_TRIG.HIGH_PRIORITY = 1
-        self._internals.CTRL_TRIG.IRQ_QUIET = 1
-        self._internals.CTRL_TRIG.TREQ_SEL = dreq  # start copying
-        self._internals.CTRL_TRIG.EN = 1  # start copying
+        self.trigger()
 
     @micropython.native
     def abort(self):
-        return self.dma.abort(self.mask)
+        self._internals.CTRL_TRIG.IRQ_QUIET = 1  # avoid completion IRQ being called
+        self.dma._internals.CHAN_ABORT &= self.mask
+        while self.dma._internals.CHAN_ABORT & self.mask:
+            pass
 
     @micropython.native
     def memcopy8(self, source, target):
@@ -314,7 +368,7 @@ class _DMA:
     def __init__(self, channels=10):
         print('Initialising DMA')
         self._internals = struct(DMA_BASE, DMA_REGS)
-        self._channels = [DMAChannel(i, self) for i in range(channels)]
+        self._channels = [DMAChannel(i, self) for i in range(channels-1, 0, -1)]
         self.abort()
 
     @micropython.native
@@ -338,6 +392,8 @@ class _DMA:
         ch = self.unused_channel()
         if ch:
             ch.allocated = True
+        else:
+            raise Exception('Unable to reserve free DMA channel')
         return ch
 
     @micropython.native
@@ -352,8 +408,8 @@ class _DMA:
         return self.unused_channel().mem_2_mem(source, target, data_size=data_size)
 
     @micropython.native
-    def mem_2_pio(self, source, state_machine_id, data_size: DMA_SIZE_32):
-        return self.unused_channel().mem_2_pio(source, state_machine_id, data_size=data_size)
+    def mem_2_pio(self, source, state_machine_id, data_size: DMA_SIZE_32, BSWAP=0):
+        return self.unused_channel().mem_2_pio(source, state_machine_id, data_size=data_size, BSWAP=BSWAP)
 
 
 dma = _DMA(channels=DMA_CHAN_COUNT)

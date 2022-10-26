@@ -13,7 +13,7 @@ from gbl import make_slice
 from pixel_buffers import PixelBuffer, PixelBufferSegment
 
 
-def hass_lightstrip(pixel_buffer, name, mqtt: hass_entities.HomeAssistantMQTT, patterns=dict()):
+def hass_lightstrip(pixel_buffer:PixelBuffer, name, mqtt: hass_entities.HomeAssistantMQTT, patterns=dict()):
     if pixel_buffer.bpp == 3:
         color_mode = "rgb"
     else:
@@ -22,30 +22,37 @@ def hass_lightstrip(pixel_buffer, name, mqtt: hass_entities.HomeAssistantMQTT, p
     effect_list = list(patterns.keys())
 
     def command_callback(entity, command):
+        try:
+            print(entity.name + ' callback with : %s' % command)
+            if command.get('effect', False) and command.get('state', 'OFF') == 'ON':
+                entity.pattern = True
+                #
+            if command.get('color', False):
+                entity.pattern = False
 
-        if command.get('effect', False) and command.get('state', 'OFF') == 'ON':
-            entity.pattern = True
-            #
-        if command.get('color', False):
-            entity.pattern = False
+            # update the following
+            for key in ['effect', 'brightness', 'color', 'state']:
+                if key in command:
+                    entity.state[key] = command[key]
 
-        # update the following
-        for key in ['effect', 'brightness', 'color', 'state']:
-            if key in command:
-                entity.state[key] = command[key]
-
-        entity.new_command.set()
-        if entity.state['state'] == 'OFF':
-            entity.state = {'state': 'OFF'}  # clear of all other info
+            entity.new_command.set()
+            if entity.state['state'] == 'OFF':
+                entity.state = {'state': 'OFF'}  # clear all other info
+        except Exception as e:
+            print('Exception caught in command callback')
+            print(e)
+            pass
         return entity.state
 
-    entity = hass_entities.HassLight(mqtt=mqtt, name=name, command_callback=command_callback, effect_list=effect_list,
+    entity = hass_entities.HassLight(mqtt=mqtt, name=name, callback=command_callback, effect_list=effect_list,
                                      color_mode=color_mode, icon="mdi:led-strip-variant")
     entity.pattern = False
     entity.new_command = uasyncio.Event()
     current_pattern = None
 
-    yield 0
+    pixel_buffer.fade(0)  # start with all black
+    yield 20
+
     while True:
         if entity.pattern and entity.state['state'] == 'ON':
             cur_time = 0
@@ -68,7 +75,7 @@ def hass_lightstrip(pixel_buffer, name, mqtt: hass_entities.HomeAssistantMQTT, p
             yield entity.new_command.wait()
 
 
-def select_pattern(pixel_buffer, patterns, black_board, entry, freq=30):
+def select_pattern(pixel_buffer:PixelBuffer, patterns, black_board, entry, freq=30):
     cycle_delay_ms = 1000 // freq
     current_pattern = None
 
@@ -93,7 +100,9 @@ def select_pattern(pixel_buffer, patterns, black_board, entry, freq=30):
         cur_time += delay_ms
 
 
-def blink(pixel_buffer: PixelBuffer, pixel, on_time_ms=200, off_time_ms=800):
+def blink(pixel_buffer: PixelBuffer, pixel=None, on_time_ms=200, off_time_ms=800):
+    if pixel is None:
+        pixel = pixel_buffer.max_pixel_value
     while True:
         pixel_buffer.fill(pixel)
         yield on_time_ms
@@ -101,7 +110,10 @@ def blink(pixel_buffer: PixelBuffer, pixel, on_time_ms=200, off_time_ms=800):
         yield off_time_ms
 
 
-def fading_bars(pixel_buffer: PixelBuffer, pixel, fade=0.9, freq=60):
+def fading_bars(pixel_buffer: PixelBuffer, pixel=None, fade=0.9, freq=60):
+    if pixel is None:
+        pixel = pixel_buffer.max_pixel_value
+
     # 1s cycle
     cycle_delay_ms = 1000 // freq
     while True:
@@ -115,7 +127,10 @@ def fading_bars(pixel_buffer: PixelBuffer, pixel, fade=0.9, freq=60):
             yield cycle_delay_ms  # changes were made to update
 
 
-def piano(pixel_buffer: PixelBuffer, pixel, fade=0.9, freq=60):
+def piano(pixel_buffer: PixelBuffer, pixel=None, fade=0.9, freq=60):
+    if pixel is None:
+        pixel = pixel_buffer.max_pixel_value
+
     cycle_delay_ms = 1000 // freq
     # hit key every 1/10s
     while True:
@@ -127,7 +142,10 @@ def piano(pixel_buffer: PixelBuffer, pixel, fade=0.9, freq=60):
             yield cycle_delay_ms  # 50 hz
 
 
-def kit(pixel_buffer: PixelBuffer, pixel, fade=0.9, freq=60, cycle_length=60):
+def kit(pixel_buffer: PixelBuffer, pixel=None, fade=0.9, freq=60, cycle_length=60):
+    if pixel is None:
+        pixel = pixel_buffer.max_pixel_value
+
     cycle_delay_ms = 1000 // freq
 
     cycle_lenght_ac = cycle_length - 1
@@ -159,7 +177,10 @@ def kit(pixel_buffer: PixelBuffer, pixel, fade=0.9, freq=60, cycle_length=60):
             yield cycle_delay_ms
 
 
-def snakes(pixel_buffer: PixelBuffer, pixel_list, max_speed=10, fade=0.9, freq=60, cycle_length_s=2):
+def snakes(pixel_buffer: PixelBuffer, pixel_list=None, max_speed=10, fade=0.9, freq=60):
+    if pixel_list is None:
+        pixel_list = [pixel_buffer.max_pixel_value]
+
     cycle_delay_ms = 1000 // freq
     l = len(pixel_buffer)
     snakes = len(pixel_list)
@@ -186,7 +207,10 @@ def snakes(pixel_buffer: PixelBuffer, pixel_list, max_speed=10, fade=0.9, freq=6
         yield cycle_delay_ms
 
 
-def cylon(pixel_buffer: PixelBuffer, pixel, fade=0.85, freq=60):
+def cylon(pixel_buffer: PixelBuffer, pixel=None, fade=0.85, freq=60):
+    if pixel is None:
+        pixel = pixel_buffer.max_pixel_value
+
     old_pos = -1
     l = len(pixel_buffer)
     cycle_delay_ms = 1000 // freq
@@ -221,7 +245,12 @@ def cylon(pixel_buffer: PixelBuffer, pixel, fade=0.85, freq=60):
             yield cycle_delay_ms  # 50 hz
 
 
-def morse_code(pixel_buffer: PixelBuffer, message, on_pixel, off_pixel, loop=True, reverse=False, dit=250):
+def morse_code(pixel_buffer: PixelBuffer, message, on_pixel=None, off_pixel=None, loop=True, reverse=False, dit=250):
+    if on_pixel is None:
+        on_pixel = pixel_buffer.max_pixel_value
+    if off_pixel is None:
+        off_pixel = pixel_buffer.fade_pixel_value(0, pixel_buffer.max_pixel_value)
+
     morse_code_itu = {
         'a': ".-",
         'b': "-...",
@@ -308,17 +337,14 @@ def morse_code(pixel_buffer: PixelBuffer, message, on_pixel, off_pixel, loop=Tru
             yield off()  # waited 3 dits already (between characters) so this makes it 7 for next message
 
 
-def breathing(pixel_buffer, pixel_list, turn_on_ms=2000, on_time_ms=1000, turn_off_ms=1900, off_time_ms=100,
+def breathing(pixel_buffer:PixelBuffer, pixel_list=None, turn_on_ms=2000, on_time_ms=1000, turn_off_ms=1900, off_time_ms=100,
               freq=60):
-    if isinstance(pixel_list[0], int):
-        def fade_fcn(x, fade):
-            return int(x * fade)
-    else:
-        def fade_fcn(x_list, fade):
-            return [int(x * fade) for x in x_list]
+    if pixel_list is None:
+        pixel_list = [pixel_buffer.max_pixel_value]
+
 
     cycle_delay_ms = 1000 // freq
-
+    fade_fcn = pixel_buffer.fade_pixel_value
     while True:
         for pixel in pixel_list:
             for i in range(0, turn_on_ms, cycle_delay_ms):
@@ -337,7 +363,10 @@ def breathing(pixel_buffer, pixel_list, turn_on_ms=2000, on_time_ms=1000, turn_o
             yield off_time_ms
 
 
-def attention(pixel_buffer, pixel, freq=60, fade=0.8):
+def attention(pixel_buffer:PixelBuffer, pixel=None, freq=60, fade=0.8):
+    if pixel is None:
+        pixel = pixel_buffer.max_pixel_value
+
     n = len(pixel_buffer)
     half = (n >> 1)
     cycle_delay_ms = 1000 // freq
@@ -398,7 +427,7 @@ def attention(pixel_buffer, pixel, freq=60, fade=0.8):
         yield 500
 
 
-def multi_pattern(pixel_buffer, segment_sizes, segment_patterns):
+def multi_pattern(pixel_buffer:PixelBuffer, segment_sizes, segment_patterns):
     assert len(segment_sizes) == len(segment_patterns)
 
     segments = []
@@ -422,7 +451,7 @@ def multi_pattern(pixel_buffer, segment_sizes, segment_patterns):
         cur_time += delay_ms
 
 
-def clear(pixel_buffer, freq=60, wait_cycles=20):
+def clear(pixel_buffer:PixelBuffer, freq=60, wait_cycles=20):
     pixel_buffer.fade(0)
     yield 0
     cycle_delay_ms = (1000 * wait_cycles) // freq
