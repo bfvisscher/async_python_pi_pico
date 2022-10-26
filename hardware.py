@@ -10,6 +10,8 @@
 #
 
 
+import os
+
 import micropython
 from uctypes import BF_POS, BF_LEN, UINT32, BFUINT32, struct, addressof
 
@@ -242,7 +244,7 @@ TREQ_UNPACED = 0x3f
 
 class DMAChannel:
     def __init__(self, channel_id, dma):
-        self.allocated = False
+        self.allocated = channel_id == 0 and 'Pico W' in os.uname()[-1] # used by wireless
         self.dma = dma
         self.id = channel_id
         self.mask = 1 << channel_id
@@ -305,19 +307,18 @@ class DMAChannel:
         return self._internals.CTRL.BUSY
 
     @micropython.native
-    def mem_2_mem(self, source, target, data_size: int = DMA_SIZE_32, BSWAP=0):
-        self._internals.CTRL.BSWAP = BSWAP
+    def mem_2_mem(self, source, target, data_size: int = DMA_SIZE_32):
         self._internals.CTRL.DATA_SIZE = data_size
         self._internals.CTRL.INCR_WRITE = 1
         self._internals.CTRL.INCR_READ = 1
         self._internals.CTRL.TREQ_SEL = TREQ_UNPACED  # start copying
         self._internals.READ_ADDR_REG = addressof(source)
         self._internals.WRITE_ADDR_REG = addressof(target)
-        self._internals.TRANS_COUNT_REG = len(source)
-        self.trigger()
+        self._internals.TRANS_COUNT_REG_TRIG = len(source)
+        # self.trigger()
 
     @micropython.native
-    def mem_2_pio(self, source, pio_state_machine, data_size: int = DMA_SIZE_32, BSWAP=0):
+    def mem_2_pio(self, source, pio_state_machine, data_size: int = DMA_SIZE_32):
         if pio_state_machine < 4:
             target = PIO0_BASE
             dreq = pio_state_machine
@@ -327,15 +328,14 @@ class DMAChannel:
             dreq = pio_state_machine + 8
         target += 0x10 + (pio_state_machine << 2)
 
-        self._internals.CTRL.BSWAP = BSWAP
         self._internals.CTRL.DATA_SIZE = data_size
         self._internals.CTRL.INCR_WRITE = 0
         self._internals.CTRL.INCR_READ = 1
         self._internals.CTRL.TREQ_SEL = dreq  # transfer at pace of pio
         self._internals.READ_ADDR_REG = addressof(source)
         self._internals.WRITE_ADDR_REG = target
-        self._internals.TRANS_COUNT_REG = len(source)
-        self.trigger()
+        self._internals.TRANS_COUNT_REG_TRIG = len(source)
+        # self.trigger()
 
     @micropython.native
     def abort(self):
@@ -398,7 +398,7 @@ class _DMA:
 
     @micropython.native
     def unused_channel(self) -> DMAChannel:
-        for ch in reversed(self._channels): # lower dma channels are used so are less reliable
+        for ch in self._channels:  # lower dma channels are used so are less reliable
             if not ch.is_busy() and not ch.allocated:
                 return ch
         return None
@@ -408,8 +408,8 @@ class _DMA:
         return self.unused_channel().mem_2_mem(source, target, data_size=data_size)
 
     @micropython.native
-    def mem_2_pio(self, source, state_machine_id, data_size: DMA_SIZE_32, BSWAP=0):
-        return self.unused_channel().mem_2_pio(source, state_machine_id, data_size=data_size, BSWAP=BSWAP)
+    def mem_2_pio(self, source, state_machine_id, data_size: DMA_SIZE_32):
+        return self.unused_channel().mem_2_pio(source, state_machine_id, data_size=data_size)
 
 
 dma = _DMA(channels=DMA_CHAN_COUNT)
