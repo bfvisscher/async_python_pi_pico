@@ -19,7 +19,6 @@ import machine
 #
 # Define the length, connected pin and strip type (bpp:3 for rgb, 4 for rgbw)
 
-machine.freq(200_000_000)
 
 upper = {'pin': 27,
          'length': 144,  # 144 
@@ -35,6 +34,15 @@ lower = {'pin': 6,
 
 with open('secrets.json', 'rt') as f:
     secrets = json.load(f)
+    
+    
+    
+bpp = 4    
+val  = [  [1,2,2.2,3], [2,3,4,5]]
+print("testing list : " , all([isinstance(pixel, (list, tuple)) and len(pixel) == bpp and
+                            all([isinstance(p, int) for p in pixel]) for pixel in val])    )
+
+
 
 hass_mqtt = async_hass.HomeAssistantMQTT('192.168.68.11:1883', secrets['mqtt.username'], secrets['mqtt.password'],
                                          secrets['wifi.ssid'], secrets['wifi.password'])
