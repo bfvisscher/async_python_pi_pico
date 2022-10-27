@@ -102,16 +102,12 @@ def neo_driver_dma(pin, pattern, n, bpp=3, state_machine=0, **kwargs):
     dma_channel = hardware.dma.allocate_channel()
 
     pixel_buffer = PixelBufferNeo(n, bpp)
-    try:
-        for delay_ms in pattern(pixel_buffer=pixel_buffer, **kwargs):
-            # sent pixels to neo pixels
-            dma_channel.mem_2_pio(pixel_buffer.buf, state_machine, hardware.DMA_SIZE_32)
 
-            yield delay_ms
+    for delay_ms in pattern(pixel_buffer=pixel_buffer, **kwargs):
+        # sent pixels to neo pixels
+        dma_channel.mem_2_pio(pixel_buffer.buf, state_machine, hardware.DMA_SIZE_32)
 
-            while dma_channel.is_busy():                
-                yield 1 # safety incase DMA didn't manage to complete
+        yield delay_ms
 
-    except Exception as e:
-        print('Caught in driver')
-        print(e)
+        while dma_channel.is_busy():
+            yield 1  # safety in case DMA didn't manage to complete

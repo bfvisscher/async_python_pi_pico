@@ -13,69 +13,115 @@ from gbl import make_slice
 from pixel_buffers import PixelBuffer, PixelBufferSegment
 
 
-def hass_lightstrip(pixel_buffer:PixelBuffer, name, mqtt: hass_entities.HomeAssistantMQTT, patterns=dict()):
+def hass_lightstrip(pixel_buffer: PixelBuffer, name, mqtt: hass_entities.HomeAssistantMQTT, patterns=dict(),
+                    brightness=255, default_pattern='monotone'):
     if pixel_buffer.bpp == 3:
         color_mode = "rgb"
     else:
         color_mode = "rgbw"
 
+    class PixelValuewithBrightness:
+        def __init__(self, lst):
+            self.lst = lst
+
+        def __setitem__(self, key, value):
+            self.lst[key] = value
+
+        def __getitem__(self, item):
+            nonlocal brightness
+            return self.lst[item] * brightness // 255
+
+        def __len__(self):
+            return len(self.lst)
+
+    single_color = PixelValuewithBrightness(pixel_buffer.max_pixel_value)
+
+    def replace_pixel_in_patterns(list_or_dict):
+        if isinstance(list_or_dict, dict):
+            for (_, pattern_args) in list_or_dict.values():
+                if isinstance(pattern_args, dict):
+                    replace_pixel_args(pattern_args)  # does it inplace
+        else:
+            for (_, pattern_args) in list_or_dict:
+                if isinstance(pattern_args, dict):
+                    replace_pixel_args(pattern_args)  # does it inplace
+
+    def replace_pixel_args(pattern_args):
+        for arg, val in pattern_args.items():  # holds pattern arguments in dict
+            if 'pattern' in arg:
+                replace_pixel_in_patterns(val)
+            elif 'pixel' in arg:
+                if isinstance(val, (list, tuple)):
+
+                    # check if it matches a list of pixels
+                    if all([isinstance(pixel, (list, tuple)) and len(pixel) == pixel_buffer.bpp and
+                            all([isinstance(p, int) for p in pixel]) for pixel in val]):
+                        # list of pixels
+
+                        val = pattern_args[arg] = [PixelValuewithBrightness(pixel) for pixel in val]
+                    elif len(val) == pixel_buffer.bpp and all([isinstance(p, int) for p in val]):
+                        # single pixel
+                        if arg == 'pixel' and isinstance(val, list):
+                            pattern_args[arg] = single_color
+                        else:
+                            pattern_args[arg] = PixelValuewithBrightness(val)
+
+    replace_pixel_in_patterns(patterns)  # in place update
+
     effect_list = list(patterns.keys())
+    effect_list.insert(0, 'monotone')
 
     def command_callback(entity, command):
-        try:
-            print(entity.name + ' callback with : %s' % command)
-            if command.get('effect', False) and command.get('state', 'OFF') == 'ON':
-                entity.pattern = True
-                #
-            if command.get('color', False):
-                entity.pattern = False
+        nonlocal brightness
+        nonlocal current_pattern
+        nonlocal single_color
+        print(entity.name + ' received command : %s' % command)
+        entity.state['state'] = command['state']  # always part of the command from hass
+        effect = command.get('effect', entity.state.get('effect', current_pattern))
+        entity.state['effect'] = effect
 
-            # update the following
-            for key in ['effect', 'brightness', 'color', 'state']:
-                if key in command:
-                    entity.state[key] = command[key]
+        color = command.get('color', False)
+        if color:
+            for i, c in enumerate(color_mode):
+                single_color[i] = color.get(c, 0)
+        command['color'] = {c: single_color.lst[i] for i, c in enumerate(color_mode)}
 
-            entity.new_command.set()
-            if entity.state['state'] == 'OFF':
-                entity.state = {'state': 'OFF'}  # clear all other info
-        except Exception as e:
-            print('Exception caught in command callback')
-            print(e)
-            pass
+        if 'brightness' in command:
+            brightness = command['brightness']
+        entity.state['brightness'] = brightness
+
+        entity.new_command.set()
+
         return entity.state
 
     entity = hass_entities.HassLight(mqtt=mqtt, name=name, callback=command_callback, effect_list=effect_list,
                                      color_mode=color_mode, icon="mdi:led-strip-variant")
-    entity.pattern = False
+
     entity.new_command = uasyncio.Event()
-    current_pattern = None
+    current_pattern = default_pattern
 
     pixel_buffer.fade(0)  # start with all black
     yield 20
 
     while True:
-        if entity.pattern and entity.state['state'] == 'ON':
-            cur_time = 0
-            new_pattern = entity.state.get('effect', current_pattern)
-            if current_pattern != new_pattern and new_pattern in patterns:
-                active_pattern = patterns[new_pattern]
+        on = entity.state.get('state', '') == 'ON'
+        effect = entity.state.get('effect', current_pattern)
+        if on and effect != 'monotone':
+            if current_pattern != effect and effect in patterns:
+                active_pattern = patterns[effect]
                 iterator = iter(active_pattern[0](pixel_buffer, **active_pattern[1]))
-                current_pattern = new_pattern
+                current_pattern = effect
             yield next(iterator)
         else:
-            if entity.state['state'] == 'ON':
-                # colour has been send
-                brightness = entity.state.get('brightness', 255)
-                color = entity.state.get('color', {})
-                pixel_buffer.fill([brightness * color.get(c, 0) // 255 for c in color_mode])
-            else:
-                # state is OFF
+            if on:  # monotone
+                pixel_buffer.fill(single_color)
+            else:  # off
                 pixel_buffer.fade(0)
             entity.new_command.clear()
             yield entity.new_command.wait()
 
 
-def select_pattern(pixel_buffer:PixelBuffer, patterns, black_board, entry, freq=30):
+def select_pattern(pixel_buffer: PixelBuffer, patterns, black_board, entry, freq=30):
     cycle_delay_ms = 1000 // freq
     current_pattern = None
 
@@ -293,22 +339,22 @@ def morse_code(pixel_buffer: PixelBuffer, message, on_pixel=None, off_pixel=None
     }
     if reverse:
         def on():
-            pixel_buffer.rotate_left(1)
+            # pixel_buffer.rotate_left(1)
             pixel_buffer[-1] = on_pixel
             return dit
 
         def off():
-            pixel_buffer.rotate_left(1)
+            # pixel_buffer.rotate_left(1)
             pixel_buffer[-1] = off_pixel
             return dit
     else:
         def on():
-            pixel_buffer.rotate_right(1)
+            # pixel_buffer.rotate_right(1)
             pixel_buffer[0] = on_pixel
             return dit
 
         def off():
-            pixel_buffer.rotate_right(1)
+            # pixel_buffer.rotate_right(1)
             pixel_buffer[0] = off_pixel
             return dit
 
@@ -337,11 +383,11 @@ def morse_code(pixel_buffer: PixelBuffer, message, on_pixel=None, off_pixel=None
             yield off()  # waited 3 dits already (between characters) so this makes it 7 for next message
 
 
-def breathing(pixel_buffer:PixelBuffer, pixel_list=None, turn_on_ms=2000, on_time_ms=1000, turn_off_ms=1900, off_time_ms=100,
+def breathing(pixel_buffer: PixelBuffer, pixel_list=None, turn_on_ms=2000, on_time_ms=1000, turn_off_ms=1900,
+              off_time_ms=100,
               freq=60):
     if pixel_list is None:
         pixel_list = [pixel_buffer.max_pixel_value]
-
 
     cycle_delay_ms = 1000 // freq
     fade_fcn = pixel_buffer.fade_pixel_value
@@ -363,7 +409,7 @@ def breathing(pixel_buffer:PixelBuffer, pixel_list=None, turn_on_ms=2000, on_tim
             yield off_time_ms
 
 
-def attention(pixel_buffer:PixelBuffer, pixel=None, freq=60, fade=0.8):
+def attention(pixel_buffer: PixelBuffer, pixel=None, freq=60, fade=0.8):
     if pixel is None:
         pixel = pixel_buffer.max_pixel_value
 
@@ -427,7 +473,7 @@ def attention(pixel_buffer:PixelBuffer, pixel=None, freq=60, fade=0.8):
         yield 500
 
 
-def multi_pattern(pixel_buffer:PixelBuffer, segment_sizes, segment_patterns):
+def multi_pattern(pixel_buffer: PixelBuffer, segment_sizes, segment_patterns):
     assert len(segment_sizes) == len(segment_patterns)
 
     segments = []
@@ -451,7 +497,7 @@ def multi_pattern(pixel_buffer:PixelBuffer, segment_sizes, segment_patterns):
         cur_time += delay_ms
 
 
-def clear(pixel_buffer:PixelBuffer, freq=60, wait_cycles=20):
+def clear(pixel_buffer: PixelBuffer, freq=60, wait_cycles=20):
     pixel_buffer.fade(0)
     yield 0
     cycle_delay_ms = (1000 * wait_cycles) // freq

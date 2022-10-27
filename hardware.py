@@ -244,7 +244,7 @@ TREQ_UNPACED = 0x3f
 
 class DMAChannel:
     def __init__(self, channel_id, dma):
-        self.allocated = channel_id == 0 and 'Pico W' in os.uname()[-1] # used by wireless
+        self.allocated = channel_id <= 1 and 'Pico W' in os.uname()[-1]  # used by wireless
         self.dma = dma
         self.id = channel_id
         self.mask = 1 << channel_id
@@ -315,7 +315,6 @@ class DMAChannel:
         self._internals.READ_ADDR_REG = addressof(source)
         self._internals.WRITE_ADDR_REG = addressof(target)
         self._internals.TRANS_COUNT_REG_TRIG = len(source)
-        # self.trigger()
 
     @micropython.native
     def mem_2_pio(self, source, pio_state_machine, data_size: int = DMA_SIZE_32):
@@ -335,7 +334,6 @@ class DMAChannel:
         self._internals.READ_ADDR_REG = addressof(source)
         self._internals.WRITE_ADDR_REG = target
         self._internals.TRANS_COUNT_REG_TRIG = len(source)
-        # self.trigger()
 
     @micropython.native
     def abort(self):
