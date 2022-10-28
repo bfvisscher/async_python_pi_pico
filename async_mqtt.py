@@ -6,6 +6,7 @@
 # Various improvements contributed by Kevin Köck.
 
 import gc
+
 import usocket as socket
 import ustruct as struct
 
@@ -45,31 +46,32 @@ else:
 ESP8266 = platform == 'esp8266'
 PYBOARD = platform == 'pyboard'
 
+
 # Default "do little" coro for optional user replacement
 async def eliza(*_):  # e.g. via set_wifi_handler(coro): see test program
     await asyncio.sleep_ms(_DEFAULT_MS)
 
 
 mqtt_config = {
-    'client_id':     hexlify(unique_id()),
-    'server':        None,
-    'port':          0,
-    'user':          '',
-    'password':      '',
-    'keepalive':     60,
+    'client_id': hexlify(unique_id()),
+    'server': None,
+    'port': 0,
+    'user': '',
+    'password': '',
+    'keepalive': 60,
     'ping_interval': 0,
-    'ssl':           False,
-    'ssl_params':    {},
+    'ssl': False,
+    'ssl_params': {},
     'response_time': 10,
-    'clean_init':    True,
-    'clean':         True,
-    'max_repubs':    4,
-    'will':          None,
-    'subs_cb':       lambda *_: None,
-    'wifi_coro':     eliza,
-    'connect_coro':  eliza,
-    'ssid':          None,
-    'wifi_pw':       None,
+    'clean_init': True,
+    'clean': True,
+    'max_repubs': 4,
+    'will': None,
+    'subs_cb': lambda *_: None,
+    'wifi_coro': eliza,
+    'connect_coro': eliza,
+    'ssid': None,
+    'wifi_pw': None,
 }
 
 
@@ -535,7 +537,7 @@ class MQTTClient(MQTT_base):
             if RP2:  # Disable auto-sleep. 
                 # https://datasheets.raspberrypi.com/picow/connecting-to-the-internet-with-pico-w.pdf
                 # para 3.6.3
-                s.config(pm = 0xa11140)
+                s.config(pm=0xa11140)
             s.connect(self._ssid, self._wifi_pw)
             for _ in range(60):  # Break out on fail or success. Check once per sec.
                 await asyncio.sleep(1)

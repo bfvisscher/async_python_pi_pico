@@ -3,8 +3,9 @@
 # https://opensource.org/licenses/MIT
 
 
-import time
 import gc
+import time
+
 import rp2
 import uasyncio
 from machine import Pin, PWM
@@ -48,11 +49,6 @@ async def _run(fcn, *nargs, exception_handler, **kwargs) -> None:
             raise
 
 
-def wait_for(fcn, *nargs, **kwargs):
-    async def __converted_to_async(fcn, *nargs, **kwargs):
-        return await fcn(*nargs, **kwargs)
-
-
 def add_task(fcn, *nargs, exception_handler=None, **kwargs):
     return uasyncio.create_task(_run(fcn, *nargs, exception_handler=exception_handler, **kwargs))
 
@@ -70,8 +66,6 @@ def start_tasks():
         gc.collect()
         gc.enable()
         cleanup()
-
-
 
 
 def cleanup():
