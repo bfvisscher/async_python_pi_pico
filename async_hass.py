@@ -13,13 +13,13 @@
 # Any publish are queued and processed in order of arrival. This allows easy use of the methods
 # without delays to the running coroutine
 
-
 import binascii
 import json
 import os
 
 import machine
 import uasyncio
+import ucollections
 
 # from copy import deepcopy
 
@@ -119,14 +119,18 @@ class HomeAssistantMQTT:
 
     def __init__(self, url, user, password, wifi_ssid, wifi_password, quick=False):
         self.publish_queue = []
+        self.publish_qos0 = ucollections.OrderedDict()
         self.subscribe_queue = []
         self.callbacks = {}
         self._mqtt_client = None
         self._mqtt_connect = {'url': url, 'user': user, 'password': password, 'wifi_ssid': wifi_ssid,
                               'wifi_password': wifi_password, 'quick': quick}
         self.anything_todo = uasyncio.Event()
-
+        self.connected = False
         self.task = uasyncio.create_task(self.update())
+
+    def is_connected(self):
+        return self.connected and self._mqtt_client.isconnected()
 
     async def connect(self, url, user, password, wifi_ssid, wifi_password, quick=False):
         from async_mqtt import MQTTClient, mqtt_config
@@ -145,7 +149,10 @@ class HomeAssistantMQTT:
         await self._mqtt_client.connect(quick=quick)
 
     def publish(self, topic, message, qos=0, retain=False):
-        self.publish_queue.append((topic, message, qos, retain))
+        if qos == 0:
+            self.publish_qos0[topic] = (message, retain)
+        else:
+            self.publish_queue.append((topic, message, qos, retain))
         self.anything_todo.set()
 
     def mqtt_callback(self, topic, msg, retained):
@@ -159,17 +166,21 @@ class HomeAssistantMQTT:
         self.anything_todo.set()
 
     async def update(self):
-
+        print('HASS MQTT Connecting...')
         await self.connect(**self._mqtt_connect)
+        self.connected = True
+        print('HASS MQTT connected!')
         while True:
-            await self.anything_todo.wait()
-
-            while len(self.publish_queue) > 0 or len(self.subscribe_queue) > 0:
+            while len(self.publish_queue) > 0 or len(self.subscribe_queue) > 0 or len(self.publish_qos0) > 0:
                 if len(self.subscribe_queue) > 0:
                     msg = self.subscribe_queue.pop(0)
                     await self._mqtt_client.subscribe(*msg)
                 elif len(self.publish_queue) > 0:
                     msg = self.publish_queue.pop(0)
                     await self._mqtt_client.publish(*msg)
+                elif len(self.publish_qos0) > 0:
+                    (topic, (msg, retain)) = self.publish_qos0.popitem()
+                    await self._mqtt_client.publish(topic, msg, 0, retain)
 
             self.anything_todo.clear()
+            await self.anything_todo.wait()
