@@ -12,7 +12,7 @@ from async_tasks import heartbeat, cpu_load
 # Materials:
 #            one button 
 #       button:
-#            connect the button to GND and pin 18 (uses pi pico pin pull-up so other resistors required)
+#            connect the button to GND and pin 18 (uses pi pico pin pull-up so no other resistors required)
 
 
 def button_change_handler(event):
@@ -23,7 +23,7 @@ def button_change_handler(event):
         print('Button has been RELEASED')
 
 
-# The Button class automatically debounces (events only occur after 4 identical measurements at 5ms intervals)
+# The Button class automatically de-bounces (events only occur after 4 identical measurements at 5ms intervals)
 # and calls the button_change_handler in the async loop
 b1 = Button(pin=18, callback=button_change_handler)
 

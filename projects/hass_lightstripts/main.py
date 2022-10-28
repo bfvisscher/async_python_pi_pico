@@ -9,17 +9,16 @@ from async_tasks import *
 from patterns import *
 
 # This is a project that runs on a pi pico W and allows for control
-# of two neostripts with different effect patterns via home assistant.
+# of two neostrips with different effect patterns via home assistant.
 #
 #
-# TO USE: MOdify line 35 in this file and setup the MQTT ip address. 
+# TO USE: Modify line 40 in this file and setup the MQTT ip address.
 #         create a json dictionary file called secrets.json and set
 #         your "mqtt.username", "mqtt.password","wifi.ssid" and "wifi.password"
 #         keys so they can be used in that same command.
 #
 #
 # Define the length, connected pin and strip type (bpp:3 for rgb, 4 for rgbw)
-machine.freq(250_000_000)
 
 upper = {'pin': 27,
          'length': 144,  # 144 
@@ -36,8 +35,7 @@ lower = {'pin': 6,
 with open('secrets.json', 'rt') as f:
     secrets = json.load(f)
 
-bpp = 4
-val = [[1, 2, 2.2, 3], [2, 3, 4, 5]]
+machine.freq(250_000_000)
 
 hass_mqtt = async_hass.HomeAssistantMQTT('192.168.68.11:1883', secrets['mqtt.username'], secrets['mqtt.password'],
                                          secrets['wifi.ssid'], secrets['wifi.password'])
